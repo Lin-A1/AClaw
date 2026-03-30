@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.eggs/
+
+# Node / Electron
+node_modules/
+out/
+dist-electron/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code
+.claude/
+
+# .claw 配置（仅 config.json 包含 apikey，其他如 skills/memory/mcp 可提交）
+.claw/config.json
+
+# 临时文件
+*.tmp
