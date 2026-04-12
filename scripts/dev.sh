@@ -5,10 +5,11 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 
 # 从 .claw/config.json 读取端口
-PORT=$(python -c "import json; print(json.load(open('$ROOT_DIR/.claw/config.json'))['server']['port'])")
+PORT=$(python -c "import json; print(json.load(open('$ROOT_DIR/.claw/config.json'))['port'])")
 
 echo "==> 安装后端依赖"
 cd "$BACKEND_DIR"
+uv venv
 uv pip install -r requirements.txt
 
 echo "==> 安装前端依赖"

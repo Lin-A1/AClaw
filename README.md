@@ -1,4 +1,4 @@
-# MultClaw
+# AClaw
 
 Personal AI assistant powered by Claude, built with Electron + FastAPI.
 
@@ -15,14 +15,14 @@ Electron 渲染进程 (React)
 
 FastAPI 后端 (Python)
   ├── api/claw.py (路由层)
-  ├── services/llm.py (Service 层: MiniMax)
+  ├── services （可调用模块）
   └── config.py (配置读取)
 ```
 
 ## 目录结构
 
 ```
-MultClaw/
+AClaw/
 ├── frontend/                     # Electron + React
 │   ├── src/
 │   │   ├── main/                 # 主进程
@@ -44,9 +44,6 @@ MultClaw/
 │   │   ├── main.py              # 入口
 │   │   ├── config.py            # 配置读取
 │   │   ├── services/            # 业务逻辑层
-│   │   │   ├── llm.py           # 预留
-│   │   │   ├── stt.py           # 预留
-│   │   │   └── tts.py           # 预留
 │   │   └── api/                  # 路由层
 │   │       └── claw.py
 │   └──requirements.txt

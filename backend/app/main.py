@@ -25,4 +25,4 @@ app = create_app()
 
 
 def get_port() -> int:
-    return config.get("server.port", 18000)
+    return config.get("port", 18000)

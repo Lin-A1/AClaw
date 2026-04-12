@@ -1,13 +1,38 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
-import { startBackend, stopBackend, getBackendUrl } from './backend'
+import { readFile, writeFile } from 'fs/promises'
+import { getBackendUrl } from './backend'
 
 let mainWindow: BrowserWindow | null = null
 
 async function createWindow() {
-  // 启动后端服务
-  const backendUrl = await startBackend()
-  console.log('[Main] Backend started at', backendUrl)
+  const backendUrl = await getBackendUrl()
+  console.log('[Main] Backend URL:', backendUrl)
+
+  ipcMain.handle('claw:backend-url', () => backendUrl)
+
+  const configPath = app.isPackaged
+    ? join(process.resourcesPath, '.claw/config.json')
+    : join(__dirname, '../../../.claw/config.json')
+
+  ipcMain.handle('config:read', async () => {
+    try {
+      const content = await readFile(configPath, 'utf-8')
+      const cfg = JSON.parse(content)
+      return cfg
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('config:write', async (_event, config: object) => {
+    try {
+      await writeFile(configPath, JSON.stringify(config, null, 2), 'utf-8')
+      return true
+    } catch {
+      return false
+    }
+  })
 
   mainWindow = new BrowserWindow({
     width: 1000,
@@ -20,12 +45,14 @@ async function createWindow() {
     },
   })
 
-  // 加载后端页面
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL(backendUrl)
-    mainWindow.webContents.openDevTools()
+  if (process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.openDevTools()
   }
 
   mainWindow.on('closed', () => {
@@ -36,7 +63,6 @@ async function createWindow() {
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
-  stopBackend()
   app.quit()
 })
 
