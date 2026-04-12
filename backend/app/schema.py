@@ -27,6 +27,5 @@ class AppConfig(BaseModel):
     description: str = ""
     version: str = "0.0.1"
     port: int = Field(default=18000, ge=1, le=65535)
-    server: ServerConfig
     paths: PathsConfig
 
