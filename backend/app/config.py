@@ -2,7 +2,7 @@
 import json
 import os
 
-from schema import AppConfig
+from app.schema import AppConfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CONFIG_DIR = os.path.join(ROOT, ".claw")
