@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Marked } from 'marked'
 import type { Message } from '../App'
 
 const BUBBLE_USER_BG = '#5b8def'
@@ -6,6 +7,12 @@ const BUBBLE_AI_BG = '#2e2e2e'
 const EMPTY_COLOR = '#555555'
 const THINK_COLOR = '#7a7a7a'
 const THINK_BG = '#252525'
+
+const marked = new Marked({ breaks: true, gfm: true })
+
+function renderMarkdown(text: string): string {
+  return marked.parse(text) as string
+}
 
 function ThinkingBlock({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
@@ -107,12 +114,10 @@ export default function Chat({ messages }: { messages: Message[] }) {
                   color: '#e5e5e5',
                   fontSize: 14,
                   lineHeight: 1.55,
-                  whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
                 }}
-              >
-                {msg.content}
-              </div>
+                dangerouslySetInnerHTML={{ __html: isUser ? renderMarkdown(msg.content) : renderMarkdown(msg.content) }}
+              />
             </div>
           </div>
         )

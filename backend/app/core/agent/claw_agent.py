@@ -1,4 +1,5 @@
 """Claw Agent 核心"""
+import os
 import re
 import uuid
 from dataclasses import dataclass
@@ -7,6 +8,8 @@ from typing import AsyncIterator, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langgraph.prebuilt import create_react_agent
+
+from app.core.tools import ReadTool, WriteTool, EditTool, BashTool, GlobTool, GrepTool
 
 from app import config
 from app.core.memory.store import MemoryStore, MemoryConfig
@@ -152,7 +155,17 @@ class ClawAgent:
 
             messages_out = result.get("messages", [])
             assistant_msgs = [m for m in messages_out if isinstance(m, AIMessage)]
-            response = assistant_msgs[-1].content if assistant_msgs else ""
+            raw_response = assistant_msgs[-1].content if assistant_msgs else ""
+
+            # 提取 thinking 并记录到 COT（非流式模式）
+            if cot:
+                response_text = raw_response if isinstance(raw_response, str) else ""
+                for m in re.finditer(r"<think>([\s\S]*?)</think>", response_text):
+                    cot.record(m.group(1).strip())
+                # 去掉 <think>...</think> 后作为最终回复
+                response = re.sub(r"<think>[\s\S]*?</think>", "", response_text)
+            else:
+                response = raw_response if isinstance(raw_response, str) else ""
 
             # 检测 skill 激活标记（小型 skills 直接注入，大型 skills 由 LLM 决定）
             activated = self._detect_skill_invoke(response)
@@ -162,7 +175,12 @@ class ClawAgent:
                 result2 = await executor2.ainvoke({"messages": input_messages})
                 messages_out2 = result2.get("messages", [])
                 assistant_msgs2 = [m for m in messages_out2 if isinstance(m, AIMessage)]
-                response = assistant_msgs2[-1].content if assistant_msgs2 else response
+                raw2 = assistant_msgs2[-1].content if assistant_msgs2 else ""
+                response2 = raw2 if isinstance(raw2, str) else ""
+                if cot:
+                    for m in re.finditer(r"<think>([\s\S]*?)</think>", response2):
+                        cot.record(m.group(1).strip())
+                response = re.sub(r"<think>[\s\S]*?</think>", "", response2)
 
             self._memory.add_message(session_id, "human", message)
             self._memory.add_message(session_id, "assistant", response)
@@ -207,6 +225,11 @@ class ClawAgent:
         input_messages = history + [HumanMessage(content=message)]
 
         full_response = ""
+        # Track raw accumulated text to extract <think>...</think> incrementally
+        raw_accumulated = ""
+        raw_cursor = 0  # How much raw text we've already emitted as clean text
+        thinking_pattern = re.compile(r"<think>([\s\S]*?)</think>")
+
         async for event in executor.astream_events(
             {"messages": input_messages},
             version="v2",
@@ -214,16 +237,34 @@ class ClawAgent:
             kind = event["event"]
             if kind == "on_chat_model_stream":
                 chunk = event["data"]["chunk"]
-                if hasattr(chunk, "additional_kwargs"):
-                    thinking = chunk.additional_kwargs.get("reasoning_content", "")
-                    if thinking:
-                        if cot:
-                            cot.record(thinking)
-                        yield AgentChunk(type="thinking", content=thinking, session_id=session_id)
                 text = chunk.content or ""
                 if text:
                     full_response += text
-                    yield AgentChunk(type="text", content=text, session_id=session_id)
+                    raw_accumulated += text
+
+                    # Extract new thinking blocks that appeared in this chunk
+                    segment = raw_accumulated[raw_cursor:]
+                    for m in thinking_pattern.finditer(segment):
+                        thinking = m.group(1).strip()
+                        if thinking:
+                            if cot:
+                                cot.record(thinking)
+                            yield AgentChunk(type="thinking", content=thinking, session_id=session_id)
+
+                    # Yield only the non-thinking portion as text
+                    clean_so_far = thinking_pattern.sub("", raw_accumulated)
+                    new_clean = clean_so_far[raw_cursor:]
+                    raw_cursor = len(clean_so_far)
+                    if new_clean:
+                        yield AgentChunk(type="text", content=new_clean, session_id=session_id)
+
+                # additional_kwargs.reasoning_content fallback (some providers use this)
+                if hasattr(chunk, "additional_kwargs"):
+                    reasoning_extra = chunk.additional_kwargs.get("reasoning_content", "")
+                    if reasoning_extra:
+                        if cot:
+                            cot.record(reasoning_extra)
+                        yield AgentChunk(type="thinking", content=reasoning_extra, session_id=session_id)
 
             elif kind == "on_tool_start":
                 yield AgentChunk(
@@ -284,4 +325,14 @@ class ClawAgent:
         ]
 
     async def _collect_tools(self) -> list:
-        return list(self._mcp.get_tools()) if self._mcp else []
+        tools = [
+            ReadTool(),
+            WriteTool(),
+            EditTool(),
+            BashTool(),
+            GlobTool(),
+            GrepTool(),
+        ]
+        if self._mcp:
+            tools.extend(self._mcp.get_tools())
+        return tools
