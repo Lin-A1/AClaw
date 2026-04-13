@@ -33,5 +33,15 @@ npm-debug.log*
 # .claw 配置（仅 config.json 包含 apikey，其他如 skills/memory/mcp 可提交）
 .claw/config.json
 
+# CoT 记录
+.claw/memory/*_cot.json
+
+# 运行时记忆数据
+.claw/memory/session/
+.claw/memory/longterm/
+
+# Skill 运行时数据（nuwa-skill 等大型 skill 目录）
+.claw/skills/nuwa-skill/
+
 # 临时文件
 *.tmp

@@ -52,6 +52,8 @@ class COTRecorder:
         return "\n\n---\n\n".join(lines)
 
     async def save(self) -> None:
+        if not self._steps:
+            return
         path = os.path.join(self._dir, f"{self._session_id}_cot.json")
         data = [asdict(s) for s in self._steps]
         with open(path, "w", encoding="utf-8") as f:

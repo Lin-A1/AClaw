@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Chat from './components/Chat'
 import ChatInput from './components/ChatInput'
 import Sidebar from './components/Sidebar'
@@ -8,6 +8,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
 }
 
 export default function App() {
@@ -17,9 +18,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [backendBase, setBackendBase] = useState<string>('')
 
+  // current assistant message being streamed (for in-place update)
+  const streamingId = useRef<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
   useEffect(() => {
     window.clawAPI.getBackendUrl().then((url) => {
-      // strip trailing slash only
       setBackendBase(url.replace(/\/$/, ''))
     })
   }, [])
@@ -27,34 +31,95 @@ export default function App() {
   if (!backendBase) return null
 
   const handleSend = async (text: string) => {
+    if (loading) return
+    // abort any in-progress stream
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
     setError(null)
 
+    // placeholders for the streaming assistant message
+    const assistantId = crypto.randomUUID()
+    const placeholder: Message = { id: assistantId, role: 'assistant', content: '', thinking: '' }
+    setMessages((prev) => [...prev, placeholder])
+    streamingId.current = assistantId
+
+    let fullText = ''
+    let fullThinking = ''
+
     try {
-      const res = await fetch(`${backendBase}/api/claw/chat`, {
+      const res = await fetch(`${backendBase}/api/claw/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setError(data.error || `HTTP ${res.status}`)
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`)
       }
-      setMessages((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), role: 'assistant', content: data.response || data.error || '' },
-      ])
+
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const text = decoder.decode(value, { stream: true })
+        for (const line of text.split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6).trim()
+          if (raw === '[DONE]' || !raw) continue
+
+          try {
+            const chunk = JSON.parse(raw)
+            if (chunk.type === 'thinking') {
+              fullThinking += chunk.content
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, thinking: fullThinking } : m
+                )
+              )
+            } else if (chunk.type === 'text') {
+              fullText += chunk.content
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: fullText } : m
+                )
+              )
+            } else if (chunk.type === 'tool_call') {
+              fullText += `[调用工具: ${chunk.tool_name}]\n`
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: fullText } : m
+                )
+              )
+            }
+          } catch {
+            // skip malformed lines
+          }
+        }
+      }
     } catch (err) {
+      if ((err as Error).name === 'AbortError') return
       const msg = err instanceof Error ? err.message : String(err)
       setError(msg)
-      setMessages((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), role: 'assistant', content: `请求失败: ${msg}` },
-      ])
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: `请求失败: ${msg}` }
+            : m
+        )
+      )
     } finally {
       setLoading(false)
+      streamingId.current = null
+      abortRef.current = null
     }
   }
 
@@ -79,6 +144,7 @@ export default function App() {
             color: '#ff8080',
             fontSize: 12,
             borderBottom: '1px solid #5a2020',
+            flexShrink: 0,
           }}>
             {error}
           </div>

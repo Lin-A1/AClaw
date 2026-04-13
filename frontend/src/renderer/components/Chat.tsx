@@ -1,14 +1,61 @@
+import { useState } from 'react'
 import type { Message } from '../App'
 
 const BUBBLE_USER_BG = '#5b8def'
 const BUBBLE_AI_BG = '#2e2e2e'
 const EMPTY_COLOR = '#555555'
+const THINK_COLOR = '#7a7a7a'
+const THINK_BG = '#252525'
 
-interface ChatProps {
-  messages: Message[]
+function ThinkingBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  if (!text.trim()) return null
+  return (
+    <div style={{ marginBottom: 6, fontSize: 12 }}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: THINK_COLOR,
+          cursor: 'pointer',
+          fontSize: 12,
+          padding: '2px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          marginBottom: open ? 4 : 0,
+        }}
+      >
+        <svg
+          width="10" height="10" viewBox="0 0 10 10"
+          style={{ transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'rotate(0deg)' }}
+          fill="none" stroke={THINK_COLOR} strokeWidth="1.5"
+        >
+          <path d="M3 2l4 3-4 3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>思考过程</span>
+      </button>
+      {open && (
+        <div style={{
+          background: THINK_BG,
+          border: '1px solid #333',
+          borderRadius: 8,
+          padding: '6px 10px',
+          color: THINK_COLOR,
+          whiteSpace: 'pre-wrap',
+          lineHeight: 1.6,
+          maxHeight: 200,
+          overflowY: 'auto',
+        }}>
+          {text}
+        </div>
+      )}
+    </div>
+  )
 }
 
-export default function Chat({ messages }: ChatProps) {
+export default function Chat({ messages }: { messages: Message[] }) {
   return (
     <div
       style={{
@@ -48,20 +95,24 @@ export default function Chat({ messages }: ChatProps) {
               marginBottom: 10,
             }}
           >
-            <div
-              style={{
-                maxWidth: '70%',
-                padding: '9px 13px',
-                borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                background: isUser ? BUBBLE_USER_BG : BUBBLE_AI_BG,
-                color: '#e5e5e5',
-                fontSize: 14,
-                lineHeight: 1.55,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
-              {msg.content}
+            <div style={{ maxWidth: '75%' }}>
+              {!isUser && msg.thinking !== undefined && (
+                <ThinkingBlock text={msg.thinking} />
+              )}
+              <div
+                style={{
+                  padding: '9px 13px',
+                  borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+                  background: isUser ? BUBBLE_USER_BG : BUBBLE_AI_BG,
+                  color: '#e5e5e5',
+                  fontSize: 14,
+                  lineHeight: 1.55,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {msg.content}
+              </div>
             </div>
           </div>
         )
