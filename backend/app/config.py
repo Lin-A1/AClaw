@@ -38,6 +38,7 @@ def _default_config() -> dict:
         },
         "paths": {
             "memory": ".claw/memory",
+            "cot": ".claw/cot",
             "skills": ".claw/skills",
             "mcp": ".claw/mcp",
             "prompts": ".claw/prompts",

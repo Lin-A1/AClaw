@@ -1,4 +1,5 @@
 """Claw Agent 核心"""
+import re
 import uuid
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
@@ -13,7 +14,6 @@ from app.core.skills.registry import SkillRegistry
 from app.core.mcp.client import MCPClient
 from app.core.hooks.registry import HookRegistry
 from app.core.hooks.types import HookEvent, HookContext
-from app.core.hooks.callback import ClawCallbackHandler
 from app.core.hooks.builtin.safety import safety_check_hook
 from app.core.hooks.builtin.logger import logger_hook
 from app.core.prompt.manager import PromptManager, PromptManagerConfig
@@ -21,6 +21,11 @@ from app.core.prompt.builder import SystemPromptBuilder, PromptBuilderConfig
 from app.core.cot.recorder import COTRecorder
 from app.core.agent.context import AgentContext
 from app.core.agent.output import AgentOutput, AgentChunk
+
+# LLM 激活 skill 的特殊标记
+_SKILL_INVOKE_RE = re.compile(r"<invoke\s+(\S+)\s*/>", re.IGNORECASE)
+# 33KB 以上视为大型 skill，避免每次全量注入
+_LARGE_SKILL_THRESHOLD = 30 * 1024
 
 
 @dataclass
@@ -116,13 +121,21 @@ class ClawAgent:
             mcp=mcp,
             hooks=hooks,
             prompt_builder=prompt_builder,
-            cot_dir=paths.abs("memory", cfg_dir),
+            cot_dir=paths.abs("cot", cfg_dir),
+        )
+
+    def _system_prompt(self, activated_skill: str | None = None) -> str:
+        return self._prompt.build(
+            session_id="",  # session_id not needed for prompt
+            skills_registry=self._skills,
+            activated_skill_name=activated_skill,
         )
 
     async def run(self, message: str, session_id: Optional[str] = None) -> AgentOutput:
         session_id = session_id or str(uuid.uuid4())
+        cot = COTRecorder(session_id, self._cot_dir) if self._cfg.enable_cot else None
 
-        hook_ctx = await self._hooks.emit(HookEvent.PRE_AGENT_RUN, HookContext(
+        await self._hooks.emit(HookEvent.PRE_AGENT_RUN, HookContext(
             event=HookEvent.PRE_AGENT_RUN,
             session_id=session_id,
         ))
@@ -130,28 +143,36 @@ class ClawAgent:
         try:
             tools = await self._collect_tools()
             history = self._build_history(session_id)
-            executor = self._build_executor(tools, session_id)
-            ctx = await self._build_context(message, session_id, history)
-
-            from langchain_core.messages import HumanMessage
             input_messages = history + [HumanMessage(content=message)]
 
+            # 第一轮：带全量 skills 索引的系统提示词
+            system_prompt = self._system_prompt()
+            executor = self._build_executor(tools, system_prompt)
             result = await executor.ainvoke({"messages": input_messages})
-            # result is {"messages": [...]} - get last assistant message
+
             messages_out = result.get("messages", [])
             assistant_msgs = [m for m in messages_out if isinstance(m, AIMessage)]
             response = assistant_msgs[-1].content if assistant_msgs else ""
 
+            # 检测 skill 激活标记（小型 skills 直接注入，大型 skills 由 LLM 决定）
+            activated = self._detect_skill_invoke(response)
+            if activated:
+                # 第二轮：注入被激活 skill 的完整内容
+                executor2 = self._build_executor(tools, self._system_prompt(activated))
+                result2 = await executor2.ainvoke({"messages": input_messages})
+                messages_out2 = result2.get("messages", [])
+                assistant_msgs2 = [m for m in messages_out2 if isinstance(m, AIMessage)]
+                response = assistant_msgs2[-1].content if assistant_msgs2 else response
+
             self._memory.add_message(session_id, "human", message)
             self._memory.add_message(session_id, "assistant", response)
-
-            if ctx.cot:
-                await ctx.cot.save()
+            if cot:
+                await cot.save()
 
             output = AgentOutput(
                 response=response,
                 session_id=session_id,
-                thought_steps=ctx.cot.get_steps() if ctx.cot else [],
+                thought_steps=cot.get_steps() if cot else [],
             )
 
         except Exception as e:
@@ -172,7 +193,6 @@ class ClawAgent:
             session_id=session_id,
             agent_output=output,
         ))
-
         return output
 
     async def stream(
@@ -180,10 +200,10 @@ class ClawAgent:
     ) -> AsyncIterator[AgentChunk]:
         session_id = session_id or str(uuid.uuid4())
         history = self._build_history(session_id)
-        ctx = await self._build_context(message, session_id, history)
+        cot = COTRecorder(session_id, self._cot_dir) if self._cfg.enable_cot else None
         tools = await self._collect_tools()
-        executor = self._build_executor(tools, session_id, streaming=True)
-        from langchain_core.messages import HumanMessage
+        system_prompt = self._system_prompt()
+        executor = self._build_executor(tools, system_prompt, streaming=True)
         input_messages = history + [HumanMessage(content=message)]
 
         full_response = ""
@@ -197,13 +217,9 @@ class ClawAgent:
                 if hasattr(chunk, "additional_kwargs"):
                     thinking = chunk.additional_kwargs.get("reasoning_content", "")
                     if thinking:
-                        if ctx.cot:
-                            ctx.cot.record(thinking)
-                        yield AgentChunk(
-                            type="thinking",
-                            content=thinking,
-                            session_id=session_id,
-                        )
+                        if cot:
+                            cot.record(thinking)
+                        yield AgentChunk(type="thinking", content=thinking, session_id=session_id)
                 text = chunk.content or ""
                 if text:
                     full_response += text
@@ -226,40 +242,33 @@ class ClawAgent:
 
         self._memory.add_message(session_id, "human", message)
         self._memory.add_message(session_id, "assistant", full_response)
-        if ctx.cot:
-            await ctx.cot.save()
+        if cot:
+            await cot.save()
+
+    def _detect_skill_invoke(self, text: str) -> str | None:
+        """检测 LLM 输出中是否包含 <invoke skill-name/> 标记"""
+        m = _SKILL_INVOKE_RE.search(text)
+        if not m:
+            return None
+        skill_name = m.group(1).strip()
+        # 验证 skill 是否存在
+        skill = self._skills.get(skill_name)
+        if skill and len(skill.prompt_template.encode()) < _LARGE_SKILL_THRESHOLD:
+            return skill_name
+        return None
 
     def _build_llm(self) -> ChatOpenAI:
-        kwargs = {
-            "model": self._cfg.model_name,
-            "openai_api_base": self._cfg.base_url,
-            "openai_api_key": self._cfg.api_key,
-            "temperature": self._cfg.temperature,
-            "streaming": True,
-        }
-        return ChatOpenAI(**kwargs)
-
-    async def _build_context(self, message: str, session_id: str, history: list | None = None) -> AgentContext:
-        system_prompt = self._prompt.build(session_id, message, history, skills_registry=self._skills)
-        cot = COTRecorder(session_id, self._cot_dir) if self._cfg.enable_cot else None
-        return AgentContext(
-            session_id=session_id,
-            user_message=message,
-            language=self._cfg.language,
-            system_prompt=system_prompt,
-            cot=cot,
+        return ChatOpenAI(
+            model=self._cfg.model_name,
+            openai_api_base=self._cfg.base_url,
+            openai_api_key=self._cfg.api_key,
+            temperature=self._cfg.temperature,
+            streaming=True,
         )
 
-    async def _collect_tools(self) -> list:
-        tools = []
-        if self._mcp:
-            tools.extend(await self._mcp.get_tools())
-        return tools
-
     def _build_executor(
-        self, tools: list, session_id: str, streaming: bool = False
+        self, tools: list, system_prompt: str, streaming: bool = False
     ):
-        system_prompt = self._prompt.build(session_id)
         return create_react_agent(
             self._llm,
             tools,
@@ -268,10 +277,11 @@ class ClawAgent:
 
     def _build_history(self, session_id: str) -> list:
         msgs = self._memory.get_history(session_id)
-        result = []
-        for m in msgs:
-            if m["role"] == "human":
-                result.append(HumanMessage(content=m["content"]))
-            elif m["role"] == "assistant":
-                result.append(AIMessage(content=m["content"]))
-        return result
+        return [
+            HumanMessage(content=m["content"]) if m["role"] == "human"
+            else AIMessage(content=m["content"])
+            for m in msgs
+        ]
+
+    async def _collect_tools(self) -> list:
+        return list(self._mcp.get_tools()) if self._mcp else []

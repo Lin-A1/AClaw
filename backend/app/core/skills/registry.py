@@ -1,11 +1,19 @@
 """Skill 注册表"""
+from dataclasses import dataclass
 from app.core.skills.schema import SkillDefinition
 from app.core.skills.loader import SkillLoader
 
 
-class SkillRegistry:
-    """Skill 注册和管理"""
+@dataclass
+class SkillIndex:
+    """Skill 索引条目 - 始终注入系统提示词，供 LLM 决策"""
+    name: str
+    description: str
+    path: str
+    tags: list[str]
 
+
+class SkillRegistry:
     def __init__(self):
         self._skills: dict[str, SkillDefinition] = {}
 
@@ -23,6 +31,18 @@ class SkillRegistry:
     def list_all(self) -> list[SkillDefinition]:
         return list(self._skills.values())
 
+    def index(self) -> list[SkillIndex]:
+        """返回所有 skills 的索引信息，供系统提示词使用"""
+        return [
+            SkillIndex(
+                name=s.name,
+                description=s.description,
+                path=s.source_file,
+                tags=s.tags,
+            )
+            for s in self._skills.values()
+        ]
+
     def build_skills_list(self) -> str:
         skills = self.list_all()
         if not skills:
@@ -30,31 +50,6 @@ class SkillRegistry:
         lines = [f"- **{s.name}**: {s.description}" for s in skills]
         return "\n".join(lines)
 
-    def match(self, message: str, history: list[dict] | None = None) -> list[SkillDefinition]:
-        """根据消息内容匹配相关技能（基于关键词相关性）"""
-        if not self._skills:
-            return []
-        message_lower = message.lower()
-        scored = []
-        for skill in self._skills.values():
-            score = 0
-            # 名字匹配（最高权重）
-            if any(kw in skill.name.lower() for kw in message_lower.split()):
-                score += 3
-            # 描述匹配
-            desc_lower = skill.description.lower()
-            for kw in message_lower.split():
-                if kw in desc_lower:
-                    score += 2
-            # 标签匹配
-            for tag in skill.tags:
-                if tag.lower() in message_lower:
-                    score += 2
-            # 模板关键词匹配
-            for kw in message_lower.split():
-                if len(kw) > 2 and kw in skill.prompt_template.lower():
-                    score += 1
-            if score > 0:
-                scored.append((score, skill))
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return [s for _, s in scored]
+    def match(self, _message: str, _history=None) -> list[SkillDefinition]:
+        """保留接口签名，实际不再需要关键词匹配"""
+        return []

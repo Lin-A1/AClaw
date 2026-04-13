@@ -45,12 +45,13 @@ class ServerConfig(BaseModel):
 # ──────────────────────────────────────────
 class PathsConfig(BaseModel):
     memory: str = "memory"
+    cot: str = "cot"
     skills: str = "skills"
     mcp: str = "mcp"
     prompts: str = "prompts"
 
     def ensure_paths(self, base: str = "") -> None:
-        dirs = [self.memory, self.skills, self.mcp, self.prompts]
+        dirs = [self.memory, self.cot, self.skills, self.mcp, self.prompts]
         subdirs = [
             os.path.join(self.memory, "session"),
             os.path.join(self.memory, "longterm"),

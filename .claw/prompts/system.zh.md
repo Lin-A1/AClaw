@@ -11,11 +11,19 @@
 ## 当前上下文
 {{ memory_context }}
 
-## 技能上下文
-{% if skills_context %}
-{{ skills_context }}
+## 可用技能（索引）
+{% if skills_index %}
+{% for line in skills_index %}
+{{ line }}
+{% endfor %}
 {% else %}
-（无匹配的技能）
+（暂无配置的技能）
+{% endif %}
+
+{% if activated_skill_body %}
+## 当前激活的技能
+{{ activated_skill_body }}
+当你需要使用某个技能的详细指导时，请在回复末尾加上 `<invoke skill-name/>`，我会为你注入该技能的完整内容。
 {% endif %}
 
 ## 行为准则

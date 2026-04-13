@@ -13,7 +13,7 @@ class PromptBuilderConfig:
 
 
 class SystemPromptBuilder:
-    """系统提示词构建 - 组合记忆和技能（按需注入）"""
+    """系统提示词构建 - 记忆 + 全量 skills 索引始终注入"""
 
     def __init__(
         self,
@@ -25,20 +25,30 @@ class SystemPromptBuilder:
         self._prompt = prompt_mgr
         self._memory = memory
 
-    def build(self, session_id: str, message: str = "", history: list | None = None, skills_registry=None) -> str:
+    def build(
+        self,
+        session_id: str,
+        skills_registry=None,
+        activated_skill_name: str | None = None,
+    ) -> str:
         template = self._prompt.get_system_template()
         memory_context = self._memory.build_system_context(session_id)
 
-        # 按需注入匹配的技能
-        skills_context = ""
+        # 始终注入全量 skills 索引（供 LLM 决策激活哪个）
+        skills_index_lines: list[str] = []
         if skills_registry is not None:
-            matched = skills_registry.match(message, history)
-            if matched:
-                blocks = []
-                from jinja2 import Template
-                for s in matched:
-                    blocks.append(Template(s.prompt_template).render())
-                skills_context = "\n\n".join(blocks)
+            for idx in skills_registry.index():
+                tags_str = f" [{', '.join(idx.tags)}]" if idx.tags else ""
+                skills_index_lines.append(
+                    f"- **{idx.name}**{tags_str}: {idx.description}  → {idx.path}"
+                )
+
+        # 按需注入被激活的 skill 完整内容
+        activated_body = ""
+        if skills_registry is not None and activated_skill_name:
+            skill = skills_registry.get(activated_skill_name)
+            if skill:
+                activated_body = f"\n\n=== 激活技能: {skill.name} ===\n{skill.prompt_template}\n===\n"
 
         return self._prompt.render(
             template,
@@ -46,6 +56,7 @@ class SystemPromptBuilder:
             agent_role=self._cfg.agent_role,
             agent_description=self._cfg.agent_description,
             memory_context=memory_context,
-            skills_context=skills_context,
+            skills_index=skills_index_lines,
+            activated_skill_body=activated_body,
             current_time=datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
