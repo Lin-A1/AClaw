@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="$ROOT_DIR/backend"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 
+# 加载 nvm（支持 Node 24）
+export NVM_DIR="$HOME/.nvm"
+if [ -s "$NVM_DIR/nvm.sh" ]; then
+    source "$NVM_DIR/nvm.sh"
+    nvm use 24.13.0 > /dev/null 2>&1 || true
+fi
+
 # 从 .claw/config.json 读取端口
 PORT=$(python3 -c "import json; print(json.load(open('$ROOT_DIR/.claw/config.json'))['port'])")
 

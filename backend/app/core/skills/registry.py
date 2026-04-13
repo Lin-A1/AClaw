@@ -23,13 +23,38 @@ class SkillRegistry:
     def list_all(self) -> list[SkillDefinition]:
         return list(self._skills.values())
 
-    def as_langchain_tools(self) -> list:
-        from app.core.skills.tool_adapter import SkillToolAdapter
-        return [SkillToolAdapter(s) for s in self._skills.values()]
-
     def build_skills_list(self) -> str:
         skills = self.list_all()
         if not skills:
             return "（暂无配置的技能）"
         lines = [f"- **{s.name}**: {s.description}" for s in skills]
         return "\n".join(lines)
+
+    def match(self, message: str, history: list[dict] | None = None) -> list[SkillDefinition]:
+        """根据消息内容匹配相关技能（基于关键词相关性）"""
+        if not self._skills:
+            return []
+        message_lower = message.lower()
+        scored = []
+        for skill in self._skills.values():
+            score = 0
+            # 名字匹配（最高权重）
+            if any(kw in skill.name.lower() for kw in message_lower.split()):
+                score += 3
+            # 描述匹配
+            desc_lower = skill.description.lower()
+            for kw in message_lower.split():
+                if kw in desc_lower:
+                    score += 2
+            # 标签匹配
+            for tag in skill.tags:
+                if tag.lower() in message_lower:
+                    score += 2
+            # 模板关键词匹配
+            for kw in message_lower.split():
+                if len(kw) > 2 and kw in skill.prompt_template.lower():
+                    score += 1
+            if score > 0:
+                scored.append((score, skill))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [s for _, s in scored]

@@ -96,7 +96,6 @@ class ClawAgent:
             ),
             prompt_mgr=prompt_mgr,
             memory=memory,
-            skills_list="",
         )
 
         agent_config = ClawAgentConfig(
@@ -122,7 +121,6 @@ class ClawAgent:
 
     async def run(self, message: str, session_id: Optional[str] = None) -> AgentOutput:
         session_id = session_id or str(uuid.uuid4())
-        ctx = await self._build_context(message, session_id)
 
         hook_ctx = await self._hooks.emit(HookEvent.PRE_AGENT_RUN, HookContext(
             event=HookEvent.PRE_AGENT_RUN,
@@ -131,11 +129,11 @@ class ClawAgent:
 
         try:
             tools = await self._collect_tools()
-            executor = self._build_executor(tools, session_id)
             history = self._build_history(session_id)
+            executor = self._build_executor(tools, session_id)
+            ctx = await self._build_context(message, session_id, history)
 
             from langchain_core.messages import HumanMessage
-            history = self._build_history(session_id)
             input_messages = history + [HumanMessage(content=message)]
 
             result = await executor.ainvoke({"messages": input_messages})
@@ -181,11 +179,11 @@ class ClawAgent:
         self, message: str, session_id: Optional[str] = None
     ) -> AsyncIterator[AgentChunk]:
         session_id = session_id or str(uuid.uuid4())
-        ctx = await self._build_context(message, session_id)
+        history = self._build_history(session_id)
+        ctx = await self._build_context(message, session_id, history)
         tools = await self._collect_tools()
         executor = self._build_executor(tools, session_id, streaming=True)
         from langchain_core.messages import HumanMessage
-        history = self._build_history(session_id)
         input_messages = history + [HumanMessage(content=message)]
 
         full_response = ""
@@ -241,8 +239,8 @@ class ClawAgent:
         }
         return ChatOpenAI(**kwargs)
 
-    async def _build_context(self, message: str, session_id: str) -> AgentContext:
-        system_prompt = self._prompt.build(session_id)
+    async def _build_context(self, message: str, session_id: str, history: list | None = None) -> AgentContext:
+        system_prompt = self._prompt.build(session_id, message, history, skills_registry=self._skills)
         cot = COTRecorder(session_id, self._cot_dir) if self._cfg.enable_cot else None
         return AgentContext(
             session_id=session_id,
@@ -253,7 +251,7 @@ class ClawAgent:
         )
 
     async def _collect_tools(self) -> list:
-        tools = list(self._skills.as_langchain_tools())
+        tools = []
         if self._mcp:
             tools.extend(await self._mcp.get_tools())
         return tools

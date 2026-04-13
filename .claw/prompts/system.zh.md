@@ -11,8 +11,12 @@
 ## 当前上下文
 {{ memory_context }}
 
-## 可用技能
-{{ skills_list }}
+## 技能上下文
+{% if skills_context %}
+{{ skills_context }}
+{% else %}
+（无匹配的技能）
+{% endif %}
 
 ## 行为准则
 - 优先理解用户真实意图，而非字面需求
