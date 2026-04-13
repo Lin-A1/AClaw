@@ -14,11 +14,13 @@ export default function App() {
   const [tab, setTab] = useState<'chat' | 'settings'>('chat')
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [backendBase, setBackendBase] = useState<string>('')
 
   useEffect(() => {
     window.clawAPI.getBackendUrl().then((url) => {
-      setBackendBase(url.replace(/\/.*/, ''))
+      // strip trailing slash only
+      setBackendBase(url.replace(/\/$/, ''))
     })
   }, [])
 
@@ -28,6 +30,7 @@ export default function App() {
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
     setMessages((prev) => [...prev, userMsg])
     setLoading(true)
+    setError(null)
 
     try {
       const res = await fetch(`${backendBase}/api/claw/chat`, {
@@ -36,12 +39,20 @@ export default function App() {
         body: JSON.stringify({ message: text }),
       })
       const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error || `HTTP ${res.status}`)
+      }
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: 'assistant', content: data.response },
+        { id: crypto.randomUUID(), role: 'assistant', content: data.response || data.error || '' },
       ])
     } catch (err) {
-      console.error(err)
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: 'assistant', content: `请求失败: ${msg}` },
+      ])
     } finally {
       setLoading(false)
     }
@@ -61,6 +72,17 @@ export default function App() {
       <Sidebar active={tab} onNavigate={setTab} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {error && (
+          <div style={{
+            padding: '8px 16px',
+            background: '#3d1a1a',
+            color: '#ff8080',
+            fontSize: 12,
+            borderBottom: '1px solid #5a2020',
+          }}>
+            {error}
+          </div>
+        )}
         {tab === 'chat' ? (
           <>
             <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
