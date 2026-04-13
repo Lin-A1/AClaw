@@ -9,7 +9,7 @@ from app import config
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="MultClaw API")
+    app = FastAPI(title="MultClaw API", redirect_slashes=False)
 
     app.add_middleware(
         CORSMiddleware,

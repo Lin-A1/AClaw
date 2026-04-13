@@ -14,7 +14,7 @@ def get_skill_registry() -> SkillRegistry:
     return registry
 
 
-@router.get("/skills")
+@router.get("/")
 async def list_skills():
     registry = get_skill_registry()
     skills = registry.list_all()
@@ -31,7 +31,7 @@ async def list_skills():
     }
 
 
-@router.get("/skills/{name}")
+@router.get("/{name}")
 async def get_skill(name: str):
     registry = get_skill_registry()
     skill = registry.get(name)

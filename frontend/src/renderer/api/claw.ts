@@ -1,9 +1,12 @@
-// API 调用封装层 - 后续可统一管理后端地址和请求逻辑
-export async function sendChat(message: string, sessionId?: string) {
-  const res = await fetch('http://localhost:8000/api/claw/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, session_id: sessionId }),
-  })
-  return res.json()
+// 通过 preload 暴露的 clawAPI 访问后端配置
+export async function getBackendUrl(): Promise<string> {
+  return window.clawAPI.getBackendUrl()
+}
+
+export async function readConfig(): Promise<object | null> {
+  return window.clawAPI.readConfig()
+}
+
+export async function writeConfig(config: object): Promise<boolean> {
+  return window.clawAPI.writeConfig(config)
 }

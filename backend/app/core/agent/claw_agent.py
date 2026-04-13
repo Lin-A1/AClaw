@@ -5,8 +5,7 @@ from typing import AsyncIterator, Optional
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain import hub
+from langgraph.prebuilt import create_react_agent
 
 from app import config
 from app.core.memory.store import MemoryStore, MemoryConfig
@@ -135,11 +134,15 @@ class ClawAgent:
             executor = self._build_executor(tools, session_id)
             history = self._build_history(session_id)
 
-            result = await executor.ainvoke({
-                "input": message,
-                "chat_history": history,
-            })
-            response = result.get("output", "")
+            from langchain_core.messages import HumanMessage
+            history = self._build_history(session_id)
+            input_messages = history + [HumanMessage(content=message)]
+
+            result = await executor.ainvoke({"messages": input_messages})
+            # result is {"messages": [...]} - get last assistant message
+            messages_out = result.get("messages", [])
+            assistant_msgs = [m for m in messages_out if isinstance(m, AIMessage)]
+            response = assistant_msgs[-1].content if assistant_msgs else ""
 
             self._memory.add_message(session_id, "human", message)
             self._memory.add_message(session_id, "assistant", response)
@@ -181,11 +184,13 @@ class ClawAgent:
         ctx = await self._build_context(message, session_id)
         tools = await self._collect_tools()
         executor = self._build_executor(tools, session_id, streaming=True)
+        from langchain_core.messages import HumanMessage
         history = self._build_history(session_id)
+        input_messages = history + [HumanMessage(content=message)]
 
         full_response = ""
         async for event in executor.astream_events(
-            {"input": message, "chat_history": history},
+            {"messages": input_messages},
             version="v2",
         ):
             kind = event["event"]
@@ -227,17 +232,14 @@ class ClawAgent:
             await ctx.cot.save()
 
     def _build_llm(self) -> ChatOpenAI:
-        return ChatOpenAI(
-            model=self._cfg.model_name,
-            openai_api_base=self._cfg.base_url,
-            openai_api_key=self._cfg.api_key,
-            temperature=self._cfg.temperature,
-            streaming=True,
-            model_kwargs={
-                "enable_thinking": self._cfg.enable_thinking,
-                "reasoning_split": True,
-            },
-        )
+        kwargs = {
+            "model": self._cfg.model_name,
+            "openai_api_base": self._cfg.base_url,
+            "openai_api_key": self._cfg.api_key,
+            "temperature": self._cfg.temperature,
+            "streaming": True,
+        }
+        return ChatOpenAI(**kwargs)
 
     async def _build_context(self, message: str, session_id: str) -> AgentContext:
         system_prompt = self._prompt.build(session_id)
@@ -259,16 +261,11 @@ class ClawAgent:
     def _build_executor(
         self, tools: list, session_id: str, streaming: bool = False
     ):
-        callback = ClawCallbackHandler(self._hooks, session_id)
-        prompt = hub.pull("hwchase17/react-chat")
-        agent = create_react_agent(self._llm, tools, prompt)
-        return AgentExecutor(
-            agent=agent,
-            tools=tools,
-            max_iterations=self._cfg.max_iterations,
-            callbacks=[callback],
-            handle_parsing_errors=True,
-            verbose=False,
+        system_prompt = self._prompt.build(session_id)
+        return create_react_agent(
+            self._llm,
+            tools,
+            prompt=system_prompt,
         )
 
     def _build_history(self, session_id: str) -> list:

@@ -1,7 +1,6 @@
 """记忆管理 API"""
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.core.agent.claw_agent import ClawAgent
 from app.core.memory.store import MemoryStore, MemoryConfig
 from app import config
 
@@ -23,46 +22,59 @@ async def get_memory_store() -> MemoryStore:
     ))
 
 
-@router.get("/memory/user")
+@router.get("/user")
 async def get_user_memory():
     memory = await get_memory_store()
     return {"content": memory.user.load()}
 
 
-@router.put("/memory/user")
+@router.put("/user")
 async def update_user_memory(body: MemoryContent):
     memory = await get_memory_store()
     memory.user.save(body.content)
     return {"ok": True}
 
 
-@router.get("/memory/preferences")
+@router.get("/preferences")
 async def get_preferences():
     memory = await get_memory_store()
     return {"content": memory.preferences.load()}
 
 
-@router.put("/memory/preferences")
+@router.put("/preferences")
 async def update_preferences(body: MemoryContent):
     memory = await get_memory_store()
     memory.preferences.save(body.content)
     return {"ok": True}
 
 
-@router.get("/memory/sessions")
+@router.get("/sessions")
 async def list_sessions():
     memory = await get_memory_store()
     return {"sessions": memory.session.list_sessions()}
 
 
-@router.delete("/memory/sessions/{session_id}")
+@router.delete("/sessions/{session_id}")
 async def delete_session(session_id: str):
     memory = await get_memory_store()
     memory.session.clear(session_id)
     return {"ok": True}
 
 
-@router.get("/memory/sessions/{session_id}/history")
+@router.get("/sessions/{session_id}/history")
 async def get_session_history(session_id: str):
     memory = await get_memory_store()
     return {"messages": memory.session.get_messages(session_id)}
+
+
+@router.get("/longterm/facts")
+async def get_longterm_facts():
+    memory = await get_memory_store()
+    return {"content": memory.longterm.load_facts()}
+
+
+@router.post("/longterm/facts")
+async def append_longterm_facts(body: MemoryContent):
+    memory = await get_memory_store()
+    memory.longterm.append_facts(body.content)
+    return {"ok": True}

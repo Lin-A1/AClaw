@@ -22,7 +22,6 @@ export interface ClawConfig {
 }
 
 export interface ClawAPI {
-  sendMessage: (message: string, sessionId?: string) => Promise<{ response: string; sessionId: string }>
   getBackendUrl: () => Promise<string>
   readConfig: () => Promise<ClawConfig | null>
   writeConfig: (config: ClawConfig) => Promise<boolean>

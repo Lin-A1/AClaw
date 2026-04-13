@@ -41,13 +41,13 @@ class ServerConfig(BaseModel):
 
 
 # ──────────────────────────────────────────
-# 路径配置
+# 路径配置（相对路径，相对于 CONFIG_DIR）
 # ──────────────────────────────────────────
 class PathsConfig(BaseModel):
-    memory: str = ".claw/memory"
-    skills: str = ".claw/skills"
-    mcp: str = ".claw/mcp"
-    prompts: str = ".claw/prompts"
+    memory: str = "memory"
+    skills: str = "skills"
+    mcp: str = "mcp"
+    prompts: str = "prompts"
 
     def ensure_paths(self, base: str = "") -> None:
         dirs = [self.memory, self.skills, self.mcp, self.prompts]
