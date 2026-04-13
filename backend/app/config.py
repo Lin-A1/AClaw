@@ -1,7 +1,6 @@
 """配置读取层 - 唯一读取 .claw/config.json 的地方"""
 import json
 import os
-
 from app.schema import AppConfig
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,13 +20,27 @@ def _default_config() -> dict:
                 "name": "gpt-4o",
                 "url": "https://api.openai.com/v1",
                 "apikey": "",
-                "params": {},
+                "params": {
+                    "temperature": 0.7,
+                    "enable_thinking": True,
+                    "reasoning_split": True,
+                    "max_tokens": 8192,
+                    "max_iterations": 20,
+                },
+            },
+            "agent": {
+                "language": "zh",
+                "enable_cot": True,
+                "enable_subagent": False,
+                "memory_flush_threshold": 0.8,
+                "session_max_messages": 50,
             },
         },
         "paths": {
-            "memory": "memory",
-            "skills": "skills",
-            "mcp": "mcp",
+            "memory": ".claw/memory",
+            "skills": ".claw/skills",
+            "mcp": ".claw/mcp",
+            "prompts": ".claw/prompts",
         },
     }
 
@@ -61,9 +74,25 @@ def get(key: str, default=None):
 
 
 # typed 访问器
+def app() -> AppConfig:
+    return _config
+
+
 def server():
     return _config.server
 
 
 def llm():
     return _config.server.llm
+
+
+def agent():
+    return _config.server.agent
+
+
+def paths():
+    return _config.paths
+
+
+def config_dir() -> str:
+    return CONFIG_DIR
