@@ -107,12 +107,15 @@ AClaw/
 │
 └── .claw/                       # 项目配置（gitignore 忽略）
     ├── config.json             # 主配置（LLM、路径等）
-    ├── memory/                  # 记忆存储
+    ├── cot/                    # Chain of Thought 记录
+    ├── memory/                  # 四层记忆存储
     │   ├── user.md             # 用户身份档案
     │   ├── preferences.md      # 用户偏好
     │   ├── session/            # 短期会话 JSON
     │   └── longterm/          # 长期记忆 MD
-    ├── skills/                  # Skill 定义
+    ├── skills/                  # Skill 定义（目录型 + 文件型）
+    │   ├── huashu-nuwa/
+    │   │   └── SKILL.md       # 女娲造人
     │   ├── commit.md
     │   ├── review.md
     │   └── summarize.md
@@ -163,34 +166,43 @@ data: [DONE]\n\n
 
 ## Skill 系统
 
-Skill 是可复用的**提示词模板**，通过**上下文匹配**按需注入到 Agent 的系统提示词中。不作为 Tool 调用，无往返开销。
+参考 Claude Code 的渐进式披露架构：
 
-### 工作原理
+1. **始终注入**：所有 Skills 的**全量索引**（name + description + path + tags）注入系统提示词，LLM 自己决定激活哪个
+2. **按需注入**：小型 Skill（<30KB）被激活时，LLM 输出 `<invoke skill-name/>` 标记，Agent 自动注入完整 SKILL.md 内容并重新调用
+3. **大型 Skill**：由 LLM 根据索引描述自行判断使用（不强制全量注入）
 
-1. **加载**: 启动时从 `.claw/skills/*.md` 加载所有 Skill 定义
-2. **匹配**: 每次对话时，根据用户消息的关键词匹配相关 Skill（匹配 name、description、tags、prompt_template）
-3. **注入**: 将匹配到的 Skill 的 `prompt_template` 渲染后，注入到 `{{ skills_context }}` 占位符
-4. **同轮完成**: Agent 在同一轮 LLM 调用中使用所有上下文，无需额外 tool_call 往返
+### 支持两种格式
 
-### 定义格式
+```text
+# 目录型（推荐）
+skills/
+  huashu-nuwa/
+    SKILL.md        ← frontmatter + body
+  commit.md         ← 也可以是单文件
 
-在 `.claw/skills/` 创建 `.md` 文件（使用 frontmatter）：
+# 文件型（兼容）
+skills/
+  commit.md
+  review.md
+```
+
+### 定义格式（SKILL.md）
 
 ```markdown
 ---
 name: my-skill
-description: 技能描述
+description: 技能描述，用于告诉 LLM 何时应该使用此技能
 language: zh
-tags: [category, keyword]
+tags: [category]
 ---
 
-# Skill 标题
+# 标题
 
 你正在帮助用户完成某项任务...
 
 ## 步骤
 1. ...
-2. ...
 ```
 
 ### 内置 Skill
@@ -198,6 +210,7 @@ tags: [category, keyword]
 - `commit`: 分析 staged 变更，生成规范的 git commit message
 - `review`: 审查代码质量、安全性和可维护性
 - `summarize`: 总结长文本或对话内容为简洁摘要
+- `huashu-nuwa`（大型 Skill，33KB）：女娲造人——蒸馏人物思维框架生成 Skill
 
 ## Hook / Harness 系统
 
@@ -223,7 +236,7 @@ Hook 在 Agent 运行的关键事件点插入自定义逻辑。
 
 ## Chain of Thought (COT)
 
-`enable_cot: true` 时，推理过程会写入 `memory/` 目录，并在下一轮对话时通过 `{{ memory_context }}` 注入上下文。
+`enable_cot: true` 时，推理过程会写入 `.claw/cot/` 目录（独立于 `memory/`）。前端支持可折叠显示。
 
 ## MCP 集成
 
