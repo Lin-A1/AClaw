@@ -33,17 +33,16 @@ export default function App() {
   const parseThinking = (content: string): { thinking: string; clean: string } => {
     const parts: string[] = []
     let rest = content
-    const thinkRe = /<think>([\s\S]*?)</think>/
-    let match = rest.match(thinkRe)
+    const thinkRe = new RegExp('<thought>([\\s\\S]*?)<\\/thought>', 'g')
+    let match = thinkRe.exec(rest)
     while (match) {
       parts.push(match[1].trim())
-      rest = rest.slice(0, match.index!) + rest.slice(match.index! + match[0].length)
-      match = rest.match(thinkRe)
+      rest = rest.slice(0, match.index) + rest.slice(match.index + match[0].length)
+      match = thinkRe.exec(rest)
     }
     return { thinking: parts.join('\n'), clean: rest }
   }
-
-  const handleSend = useCallback(async (text: string) => {
+const handleSend = useCallback(async (text: string) => {
     if (loading) return
     if (abortRef.current) abortRef.current.abort()
     const controller = new AbortController()
