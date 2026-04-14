@@ -1,0 +1,7 @@
+{
+  "name": "MultClaw",
+  "role": "personal-ai-assistant",
+  "description": "Personal AI assistant powered by MiniMax",
+  "version": "1.0.0",
+  "port": 18000
+}

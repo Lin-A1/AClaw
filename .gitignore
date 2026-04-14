@@ -31,10 +31,7 @@ npm-debug.log*
 .claude/
 
 # .claw 配置
-.claw/config.json
-
-# CoT 记录（独立目录）
-.claw/cot/
+.env
 
 # 运行时记忆数据
 .claw/memory/session/
