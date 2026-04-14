@@ -1,328 +1,190 @@
-# AClaw
+# AClaw - Anthropic Claude Agent 框架
 
-Personal AI assistant powered by MiniMax, built with Electron + FastAPI + LangChain/LangGraph.
+基于 Anthropic SDK 的模块化 AI Agent 开发框架，支持 Tool Use、对话记忆、多入口部署。
 
-## 快速开始
+---
 
-```bash
-# 启动后端 + 前端（需要先配置 .claw/config.json 中的 LLM API Key）
-bash scripts/dev.sh
-```
-
-- **后端**: http://localhost:18000（端口由 `.claw/config.json` 配置）
-- **前端**: http://localhost:5173（Electron 应用）
-- **API 文档**: http://localhost:18000/docs
-
-> **注意**: 修改端口或 LLM 配置后需重启后端。
-
-## 架构
-
-```
-Electron 主进程
-  ├── BrowserWindow (UI 窗口)
-  └── preload/index.ts (IPC 桥接，访问 .claw/config.json)
-
-Electron 渲染进程 (React)
-  └── App.tsx → components/Chat + ChatInput + Settings + Sidebar
-
-FastAPI 后端 (Python)
-  ├── api/claw.py      # 聊天 API - 支持流式 SSE
-  ├── api/memory.py    # 记忆管理 API
-  ├── api/skills.py    # Skill 查询 API
-  ├── core/agent/      # Agent 核心 - LangGraph ReAct
-  ├── core/memory/     # 四层记忆系统
-  ├── core/skills/     # Skill 系统（自动加载提示词包）
-  ├── core/mcp/        # MCP 客户端（Model Context Protocol）
-  ├── core/hooks/      # Hook/Harness 事件系统
-  ├── core/prompt/     # 提示词模板管理（Jinja2）
-  └── core/cot/        # Chain of Thought 记录器
-```
-
-## 目录结构
+## 项目结构
 
 ```
 AClaw/
-├── frontend/                     # Electron + React (electron-vite)
-│   ├── src/
-│   │   ├── main/                 # 主进程 (Electron)
-│   │   │   ├── index.ts          # 窗口管理、IPC 注册
-│   │   │   └── backend.ts        # 从 .claw/config.json 读取后端地址
-│   │   ├── preload/              # 上下文隔离桥接
-│   │   └── renderer/             # 渲染进程 (React)
-│   │       ├── App.tsx           # 根组件
-│   │       ├── api/claw.ts       # 后端配置 API 封装
-│   │       └── components/
-│   │           ├── Chat.tsx      # 消息列表
-│   │           ├── ChatInput.tsx # 输入框
-│   │           ├── Sidebar.tsx   # 侧边栏
-│   │           └── Settings.tsx  # 配置编辑器
-│   ├── electron.vite.config.ts
-│   └── package.json
+├── .env                        # ⚠️ 运行时密钥（API Key 等），不提交 git
+├── .env.example                # 环境变量模板，复制后填入真实值
+├── .claw/config.json           # 项目元信息，可提交（不含密钥）
 │
-├── backend/                      # FastAPI + LangChain
-│   ├── app/
-│   │   ├── main.py              # FastAPI 入口
-│   │   ├── config.py            # 唯一读取 .claw/config.json 的地方
-│   │   ├── schema.py            # Pydantic 配置模型
-│   │   ├── api/
-│   │   │   ├── claw.py          # POST /chat, /chat/stream
-│   │   │   ├── memory.py         # 记忆 CRUD
-│   │   │   └── skills.py         # Skill 查询
-│   │   └── core/
-│   │       ├── agent/
-│   │       │   ├── claw_agent.py # LangGraph ReAct Agent
-│   │       │   ├── context.py    # AgentContext
-│   │       │   └── output.py     # AgentOutput / AgentChunk
-│   │       ├── memory/
-│   │       │   ├── store.py      # 四层记忆统一门面
-│   │       │   ├── user.py       # 用户身份 (user.md)
-│   │       │   ├── preferences.py# 用户偏好 (preferences.md)
-│   │       │   ├── session.py    # 短期会话 (session/*.json)
-│   │       │   └── longterm.py  # 长期记忆提炼 (longterm/)
-│   │       ├── skills/
-│   │       │   ├── schema.py    # SkillDef 数据模型
-│   │       │   ├── loader.py    # frontmatter 解析
-│   │       │   └── registry.py  # Skill 注册表
-│   │       ├── mcp/
-│   │       │   ├── loader.py    # MCP 服务器配置加载
-│   │       │   ├── client.py    # MCP HTTP 客户端
-│   │       │   └── tool_adapter.py # MCP → LangChain Tool
-│   │       ├── hooks/
-│   │       │   ├── types.py     # HookEvent / HookContext
-│   │       │   ├── registry.py  # 同步/异步 Hook 注册表
-│   │       │   ├── callback.py  # LangChain CallbackHandler
-│   │       │   └── builtin/
-│   │       │       ├── safety.py   # PRE_TOOL_USE 安全检查
-│   │       │       ├── logger.py   # POST_TOOL_USE 日志
-│   │       │       └── memory_flush.py # 内存自动 flush
-│   │       ├── prompt/
-│   │       │   ├── manager.py   # Jinja2 模板 + 语言切换
-│   │       │   └── builder.py    # 系统提示词组合
-│   │       └── cot/
-│   │           └── recorder.py  # CoT 推理过程记录
-│   └── requirements.txt
+├── pyproject.toml              # uv / pip 依赖配置
+├── requirements.txt            # pip 依赖列表
 │
-├── scripts/
-│   └── dev.sh                   # 安装依赖 + 启动后端/前端
+├── src/claude_agent/
+│   ├── core/                   # 核心逻辑
+│   │   ├── agent.py            # Agent 主循环，驱动对话流程
+│   │   ├── client.py           # Anthropic SDK 封装，发送请求/处理响应
+│   │   └── memory.py           # 对话历史管理，上下文窗口控制
+│   │
+│   ├── tools/                  # 工具定义（Tool Use）
+│   │   ├── base.py             # Tool 基类 + 注册机制
+│   │   ├── web_search.py       # 示例工具：网络搜索
+│   │   ├── file_reader.py      # 示例工具：读写文件
+│   │   └── calculator.py       # 示例工具：计算器
+│   │
+│   ├── prompts/                # Prompt 管理
+│   │   ├── system.py           # System Prompt 模板，定义 Agent 角色行为
+│   │   └── templates/          # Prompt 模板文件
+│   │       └── agent.txt
+│   │
+│   ├── config/                 # 配置加载
+│   │   └── settings.py         # 读取 .env + config.json，统一配置入口
+│   │
+│   └── utils/                  # 工具函数
+│       ├── logger.py           # 日志配置
+│       └── helpers.py          # 通用辅助函数
 │
-└── .claw/                       # 项目配置（gitignore 忽略）
-    ├── config.json             # 主配置（LLM、路径等）
-    ├── cot/                    # Chain of Thought 记录
-    ├── memory/                  # 四层记忆存储
-    │   ├── user.md             # 用户身份档案
-    │   ├── preferences.md      # 用户偏好
-    │   ├── session/            # 短期会话 JSON
-    │   └── longterm/          # 长期记忆 MD
-    ├── skills/                  # Skill 定义（目录型 + 文件型）
-    │   ├── huashu-nuwa/
-    │   │   └── SKILL.md       # 女娲造人
-    │   ├── commit.md
-    │   ├── review.md
-    │   └── summarize.md
-    ├── prompts/                 # 提示词模板
-    │   ├── system.zh.md
-    │   ├── system.en.md
-    │   └── fragments/
-    └── mcp/                    # MCP 服务器配置
+├── interfaces/                 # 交互入口
+│   ├── cli.py                  # 命令行对话界面
+│   ├── api_server.py           # FastAPI Web 服务
+│   └── gradio_app.py           # Gradio 可视化界面
+│
+├── tests/                      # 单元 & 集成测试
+│   ├── test_agent.py
+│   ├── test_tools.py
+│   └── fixtures/
+│       └── sample_responses.json
+│
+└── examples/                   # 使用示例
+    ├── simple_chat.py          # 基础对话示例
+    ├── tool_use_demo.py        # 工具调用示例
+    └── multi_turn_demo.py      # 多轮对话示例
 ```
 
-## API 端点
-
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/claw/chat` | POST | 非流式聊天，返回 `response` + `session_id` |
-| `/api/claw/chat/stream` | POST | SSE 流式聊天，逐块返回 `thinking` / `text` / `tool_call` / `tool_result` |
-| `/api/claw/memory/user` | GET/PUT | 用户身份档案 |
-| `/api/claw/memory/preferences` | GET/PUT | 用户偏好 |
-| `/api/claw/memory/sessions` | GET | 会话列表 |
-| `/api/claw/memory/sessions/{id}` | DELETE | 删除会话 |
-| `/api/claw/memory/sessions/{id}/history` | GET | 获取会话历史 |
-| `/api/claw/memory/longterm/facts` | GET/POST | 长期记忆事实 |
-| `/api/claw/skills/` | GET | Skill 列表 |
-| `/api/claw/skills/{name}` | GET | Skill 详情 |
-
-### 流式 SSE 格式
-
-`POST /api/claw/chat/stream` 返回 Server-Sent Events 流，每条消息格式：
-
-```
-data: {"type": "thinking", "content": "...", "session_id": "..."}\n\n
-data: {"type": "text", "content": "...", "session_id": "..."}\n\n
-data: {"type": "tool_call", "content": "...", "tool_name": "...", "session_id": "..."}\n\n
-data: {"type": "tool_result", "content": "...", "tool_name": "...", "session_id": "..."}\n\n
-data: [DONE]\n\n
-```
-
-## 四层记忆系统
-
-| 层级 | 存储位置 | 内容 | 加载时机 |
-|------|----------|------|----------|
-| **用户偏好** | `memory/preferences.md` | 通信风格、工作习惯 | 每次会话 |
-| **用户信息** | `memory/user.md` | 身份背景、长期事实 | 每次会话 |
-| **短期记忆** | `memory/session/*.json` | 当前会话消息 | 实时读写 |
-| **长期记忆** | `memory/longterm/facts.md` | 提炼的事实 | 按需自动加载 |
-
-记忆内容通过 Jinja2 模板注入到系统提示词的 `{{ memory_context }}` 占位符中。
-
-## Skill 系统
-
-参考 Claude Code 的渐进式披露架构：
-
-1. **始终注入**：所有 Skills 的**全量索引**（name + description + path + tags）注入系统提示词，LLM 自己决定激活哪个
-2. **按需注入**：小型 Skill（<30KB）被激活时，LLM 输出 `<invoke skill-name/>` 标记，Agent 自动注入完整 SKILL.md 内容并重新调用
-3. **大型 Skill**：由 LLM 根据索引描述自行判断使用（不强制全量注入）
-
-### 支持两种格式
-
-```text
-# 目录型（推荐）
-skills/
-  huashu-nuwa/
-    SKILL.md        ← frontmatter + body
-  commit.md         ← 也可以是单文件
-
-# 文件型（兼容）
-skills/
-  commit.md
-  review.md
-```
-
-### 定义格式（SKILL.md）
-
-```markdown
----
-name: my-skill
-description: 技能描述，用于告诉 LLM 何时应该使用此技能
-language: zh
-tags: [category]
 ---
 
-# 标题
+## 文件职责说明
 
-你正在帮助用户完成某项任务...
+### 运行时密钥（不提交 git）
 
-## 步骤
-1. ...
+**`.env`** — API Key、Token 等敏感凭证
+```
+ANTHROPIC_NAME=MiniMax-M2.7
+ANTHROPIC_URL=https://api.minimaxi.com/v1
+ANTHROPIC_APIKEY=your-api-key-here
 ```
 
-### 内置 Skill
+### 项目元信息（可提交）
 
-- `commit`: 分析 staged 变更，生成规范的 git commit message
-- `review`: 审查代码质量、安全性和可维护性
-- `summarize`: 总结长文本或对话内容为简洁摘要
-- `huashu-nuwa`（大型 Skill，33KB）：女娲造人——蒸馏人物思维框架生成 Skill
-
-## Hook / Harness 系统
-
-Hook 在 Agent 运行的关键事件点插入自定义逻辑。
-
-### 支持的事件
-
-| 事件 | 触发时机 | 阻塞 |
-|------|----------|------|
-| `PRE_AGENT_RUN` | Agent 运行前 | - |
-| `POST_AGENT_RUN` | Agent 运行后 | - |
-| `ON_AGENT_ERROR` | Agent 出错时 | - |
-| `PRE_TOOL_USE` | 工具调用前 | 可阻断 |
-| `POST_TOOL_USE` | 工具调用后 | - |
-| `PRE_MEMORY_FLUSH` | 记忆 flush 前 | - |
-| `POST_MEMORY_FLUSH` | 记忆 flush 后 | - |
-
-### 内置 Hook
-
-- `safety_check_hook` (`PRE_TOOL_USE`): 阻止危险操作
-- `logger_hook` (`POST_TOOL_USE`): 记录工具调用日志
-- `memory_flush_hook` (`PRE_AGENT_RUN`): 自动 flush 接近 token 限制的会话
-
-## Chain of Thought (COT)
-
-`enable_cot: true` 时，推理过程会写入 `.claw/cot/` 目录（独立于 `memory/`）。前端支持可折叠显示。
-
-## MCP 集成
-
-MCP (Model Context Protocol) 服务器定义在 `.claw/mcp/mcp.json`：
-
-```json
-[
-  {
-    "name": "filesystem",
-    "command": "npx",
-    "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
-  }
-]
-```
-
-## 配置
-
-所有配置通过 `.claw/config.json` 管理（**唯一配置源**）：
-
+**`.claw/config.json`** — 不含密钥的结构化配置，团队共享
 ```json
 {
   "name": "MultClaw",
   "role": "personal-ai-assistant",
   "description": "Personal AI assistant powered by MiniMax",
-  "port": 18000,
-  "server": {
-    "llm": {
-      "name": "MiniMax-M2.7",
-      "url": "https://api.minimaxi.com/v1",
-      "apikey": "sk-cp-...",
-      "params": {
-        "temperature": 0.7,
-        "enable_thinking": true,
-        "reasoning_split": true,
-        "max_tokens": 8192,
-        "max_iterations": 20
-      }
-    },
-    "agent": {
-      "language": "zh",
-      "enable_cot": true,
-      "memory_flush_threshold": 0.8,
-      "session_max_messages": 50
-    }
-  },
-  "paths": {
-    "memory": "memory",
-    "skills": "skills",
-    "mcp": "mcp",
-    "prompts": "prompts"
-  }
+  "version": "1.0.0",
+  "port": 18000
 }
 ```
 
-> 修改配置后需重启后端服务（`uvicorn` 不会热重载 config）。
+### 核心逻辑
 
-### 前端配置编辑器
+**`src/claude_agent/core/agent.py`**
+- Agent 主循环：接收用户输入 → 构建消息列表 → 调用 LLM → 解析响应 → 执行工具或返回文本
+- 管理对话轮次、最大迭代次数、停止条件
 
-应用内置 Settings 页面（侧边栏 → 设置），可直接编辑 `config.json`，保存后需手动重启后端。
+**`src/claude_agent/core/client.py`**
+- 封装 Anthropic SDK（`anthropic` 包）
+- 处理 `messages`、`tools`、`system_prompt` 的组装
+- 流式输出（streaming）支持
 
-## 开发
+**`src/claude_agent/core/memory.py`**
+- 管理对话历史（`messages` 列表）
+- 控制上下文窗口长度（token 预算）
+- 支持历史摘要（summarization）策略
 
-### 环境要求
+### 工具系统
 
-- **Python**: 3.10+
-- **Node.js**: 18+（推荐 Node 24，dev.sh 会自动通过 nvm 加载）
-- **包管理**: `uv` (Python), `npm` (Node.js)
+**`src/claude_agent/tools/base.py`**
+- Tool 基类定义（`name`、`description`、`parameters`、`execute()`）
+- 工具注册表（Decorator 或显式注册）
 
-### 常用命令
+**`src/claude_agent/tools/*.py`**
+- 每个文件一个工具，继承基类
+- `web_search.py`：搜索工具
+- `file_reader.py`：文件读写工具
+- `calculator.py`：计算工具
+
+### Prompt 管理
+
+**`src/claude_agent/prompts/system.py`**
+- 定义 System Prompt 模板
+- 包含 Agent 角色设定、行为约束、工具说明
+
+**`src/claude_agent/prompts/templates/agent.txt`**
+- Agent 对话模板，可按场景切换
+
+### 配置加载
+
+**`src/claude_agent/config/settings.py`**
+- 统一加载 `.env`（密钥）+ `.claw/config.json`（元信息）
+- 提供类型化配置访问接口（`settings.llm.name`、`settings.server.port` 等）
+
+### 交互入口
+
+**`interfaces/cli.py`** — 命令行界面，适合调试
+**`interfaces/api_server.py`** — FastAPI 服务，适合生产接入
+**`interfaces/gradio_app.py`** — Gradio 界面，适合快速演示
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
 
 ```bash
-# 安装依赖 + 启动（推荐）
-bash scripts/dev.sh
+# 使用 uv（推荐）
+uv sync
 
-# 仅启动后端
-cd backend && uv venv && uv pip install -r requirements.txt && uvicorn app.main:app --port 18000
-
-# 仅构建前端
-cd frontend && npm install && npm run build
+# 或使用 pip
+pip install -r requirements.txt
 ```
 
-### 代码风格
+### 2. 配置环境变量
 
-Python: 参考 `lin-deeplearning` skill 的代码规范。
+```bash
+cp .env.example .env
+# 编辑 .env，填入真实的 API Key
+```
 
-## 依赖
+### 3. 运行示例
 
-- **Python**: fastapi, uvicorn, langchain, langgraph, mcp, jinja2, frontmatter, pyyaml
-- **Node.js**: electron, electron-vite, react
+```bash
+# 命令行对话
+python -m interfaces.cli
+
+# 或直接运行示例
+python examples/simple_chat.py
+```
+
+---
+
+## 开发指南
+
+### 添加新工具
+
+1. 在 `src/claude_agent/tools/` 新建文件，如 `my_tool.py`
+2. 继承 `BaseTool`，实现 `name`、`description`、`parameters`、`execute()`
+3. 在 `tools/base.py` 的注册表中添加（或使用装饰器）
+4. 重启 Agent 即可使用
+
+### 添加新交互入口
+
+1. 在 `interfaces/` 新建文件
+2. 实例化 `ClaudeAgent` 并调用其 `run()` 方法
+3. 处理输入输出格式（CLI 文本 / API JSON / UI 组件）
+
+### 配置加载流程
+
+```
+.env ──────────────► settings.py ◄─────── config.json
+(ANTHROPIC_APIKEY)      │            (name, port, ...)
+                        │
+                        ▼
+                   Agent / Client
+```

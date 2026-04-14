@@ -30,7 +30,7 @@ npm-debug.log*
 # Claude Code
 .claude/
 
-# .claw 配置（仅 config.json 包含 apikey，其他如 skills/memory/mcp 可提交）
+# .claw 配置
 .claw/config.json
 
 # CoT 记录（独立目录）
@@ -40,8 +40,8 @@ npm-debug.log*
 .claw/memory/session/
 .claw/memory/longterm/
 
-# Skill 运行时数据（nuwa-skill 等大型 skill 目录）
-.claw/skills/nuwa-skill/
+# Skill 运行时数据
+.claw/skills/*
 
 # 临时文件
 *.tmp
