@@ -4,12 +4,10 @@ Memory — 长期记忆 + 用户画像 + 会话历史。
 使用方式：
     from claw.core.memory import memory
 
-    memory.userprofile.user_info.content    # str，user.md 内容
-    memory.userprofile.user_info.path      # str，user.md 路径
-    memory.userprofile.preferences.content # str，preferences.md 内容
-    memory.userprofile.preferences.path    # str，preferences.md 路径
-    memory.longterm.longterm_dir           # str
-    memory.shortterm                       # str（占位）
+    memory.userprofile.user_info      # str，user.md 内容
+    memory.userprofile.preferences   # str，preferences.md 内容
+    memory.longterm.longterm_dir    # str
+    memory.shortterm               # str（占位）
 """
 
 from __future__ import annotations
@@ -19,30 +17,19 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+
 _ROOT: Path = Path(__file__).parent.parent.parent.parent
 _MEMORY_DIR: Path = _ROOT / ".claw" / "memory"
 _LONGTERM_DIR: Path = _MEMORY_DIR / "longterm"
 
 
-class UserInfo(BaseModel):
-    """用户信息：content=文件内容，path=文件路径。"""
-
-    content: str = ""
-    path: str = ""
-
-
-class Preferences(BaseModel):
-    """用户偏好：content=文件内容，path=文件路径。"""
-
-    content: str = ""
-    path: str = ""
-
-
 class UserProfile(BaseModel):
     """用户画像。"""
 
-    user_info: UserInfo
-    preferences: Preferences
+    user_info: str = ""
+    preferences: str = ""
+    user_info_path: str = ""
+    preferences_path: str = ""
 
 
 class LongTermMemory(BaseModel):
@@ -70,8 +57,10 @@ def _get_memory() -> Memory:
 
     return Memory(
         userprofile=UserProfile(
-            user_info=UserInfo(content=user_info_content, path=str(user_info_path)),
-            preferences=Preferences(content=preferences_content, path=str(preferences_path)),
+            user_info=user_info_content,
+            preferences=preferences_content,
+            user_info_path=str(user_info_path),
+            preferences_path=str(preferences_path),
         )
     )
 
