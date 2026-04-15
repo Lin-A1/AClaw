@@ -1,6 +1,6 @@
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import wrap_tool_call
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -10,11 +10,17 @@ from claw.tools import ALL_TOOLS
 
 
 class LongTermState(AgentState):
-    """Agent 状态结构，初始值在 invoke 时传入。"""
+    """Agent 状态，继承 memory 模块的结构。"""
 
-    user_info: dict
-    preferences: dict
-    longterm: str
+    user_info: dict = {
+        "用户信息": memory.userprofile.user_info,
+        "存储路径": memory.userprofile.user_info_path,
+    }
+    preferences: dict = {
+        "用户偏好": memory.userprofile.preferences,
+        "存储路径": memory.userprofile.preferences_path,
+    }
+    longterm: str = f"用户长期记录存储目录：{memory.longterm.longterm_dir}"
 
 
 @wrap_tool_call
@@ -49,16 +55,12 @@ def invoke(message: str, thread_id: str = "1"):
     """便捷调用入口。"""
     return agent.invoke(
         {
-            "messages": [{"role": "user", "content": message}],
-            "user_info": {
-                "用户信息": memory.userprofile.user_info,
-                "存储路径": memory.userprofile.user_info_path,
-            },
-            "preferences": {
-                "用户偏好": memory.userprofile.preferences,
-                "存储路径": memory.userprofile.preferences_path,
-            },
-            "longterm": f"用户长期记录存储目录：{memory.longterm.longterm_dir}",
+            "messages": [
+                SystemMessage(content="your name aclaw"),
+                {"role": "user", "content": message},
+            ]
         },
         {"configurable": {"thread_id": thread_id}},
     )
+
+print(invoke("我叫什么"))

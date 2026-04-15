@@ -17,7 +17,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-
 _ROOT: Path = Path(__file__).parent.parent.parent.parent
 _MEMORY_DIR: Path = _ROOT / ".claw" / "memory"
 _LONGTERM_DIR: Path = _MEMORY_DIR / "longterm"
@@ -44,8 +43,6 @@ class Memory(BaseModel):
     userprofile: UserProfile = Field(default_factory=UserProfile)
     longterm: LongTermMemory = Field(default_factory=LongTermMemory)
     shortterm: str = ""  # 占位
-    session: str = ""  # 占位
-
 
 @lru_cache(maxsize=1)
 def _get_memory() -> Memory:

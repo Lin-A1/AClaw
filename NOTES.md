@@ -9,7 +9,11 @@ AClaw/
 ├── .gitignore                   # git 忽略规则
 ├── .claw/                       # 项目数据（可提交结构，不含敏感数据）
 │   ├── config.json             # 项目元信息
-│   └── logs/                   # 日志文件（自动生成，不提交 git）
+│   ├── logs/                   # 日志文件（自动生成，不提交 git）
+│   └── memory/                 # 记忆存储
+│       ├── user.md             # 用户画像（user_info + path）
+│       ├── preferences.md       # 用户偏好（preferences + path）
+│       └── longterm/           # 长期历史（不读内容）
 ├── .env                         # 环境变量（API Key 等，不提交到 git）
 ├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
 ├── requirements.txt             # 依赖列表
@@ -23,7 +27,7 @@ AClaw/
 │   │   ├── __init__.py
 │   │   ├── agent.py             # Agent 主类，驱动对话循环
 │   │   ├── client.py            # SDK 封装
-│   │   └── memory.py            # 对话历史 / 上下文管理
+│   │   └── memory.py            # 记忆模块（userprofile/longterm/shortterm）
 │   │
 │   ├── tools/                   # 内置工具（LangChain @tool）
 │   │   ├── __init__.py         # ALL_TOOLS 工具列表导出
@@ -161,6 +165,39 @@ logger.error("failed")
 - Console 输出带颜色，级别 INFO+
 - 文件记录全量 DEBUG+
 - 线程安全，支持多进程（`enqueue=True`）
+
+---
+
+## 记忆模块
+
+统一入口：`from claw.core.memory import memory`
+
+结构：
+
+```
+Memory
+├── userprofile
+│   ├── user_info: str          # .claw/memory/user.md 内容
+│   ├── preferences: str        # .claw/memory/preferences.md 内容
+│   ├── user_info_path: str     # .claw/memory/user.md 路径
+│   └── preferences_path: str   # .claw/memory/preferences.md 路径
+├── longterm
+│   └── longterm_dir: str       # .claw/memory/longterm/ 路径（只写不读）
+├── shortterm: str               # 占位
+└── session: str                 # 占位
+```
+
+使用方式：
+
+```python
+from claw.core.memory import memory
+
+memory.userprofile.user_info       # str
+memory.userprofile.preferences     # str
+memory.userprofile.user_info_path  # str
+memory.userprofile.preferences_path # str
+memory.longterm.longterm_dir       # str
+```
 
 ---
 

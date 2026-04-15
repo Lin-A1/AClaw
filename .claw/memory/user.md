@@ -1,6 +1,6 @@
 ---
-name: user
-description: User profile — basic identity and background
+name:
+description:
 type: user
 ---
 
@@ -12,8 +12,5 @@ type: user
 - **Background**:
 
 ## Work Focus
-- DeepLearning / LLM related development
 
 ## Notes
-- Persists across all sessions
-- Loaded into system prompt on every new session
