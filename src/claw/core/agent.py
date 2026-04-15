@@ -9,8 +9,13 @@ from claw.tools import ALL_TOOLS
 
 
 class LongTermState(AgentState):
-    user_info: str
-    preferences: str
+    """Agent 状态，继承 memory 模块的结构。"""
+
+    userprofile: dict = {}
+    longterm: dict = {}
+    shortterm: str = ""
+    session: str = ""
+
 
 @wrap_tool_call
 def handle_tool_errors(request, handler):
@@ -18,7 +23,6 @@ def handle_tool_errors(request, handler):
     try:
         return handler(request)
     except Exception as e:
-        # 向模型返回自定义错误消息
         return ToolMessage(
             content=f"工具错误：请检查您的输入并重试。({str(e)})",
             tool_call_id=request.tool_call["id"]
@@ -37,15 +41,5 @@ agent = create_agent(
     tools=ALL_TOOLS,
     state_schema=LongTermState,
     checkpointer=InMemorySaver(),
-    middleware=[handle_tool_errors]
+    middleware=[handle_tool_errors],
 )
-response = agent.invoke(
-    {"messages": [{"role": "user", "content": "Hello"}]},
-    {"configurable": {"thread_id": "1"}},
-)
-
-response = agent.invoke(
-    {"messages": [{"role": "user", "content": "我叫什么"}]},
-    {"configurable": {"thread_id": "1"}},
-)
-print(response)
