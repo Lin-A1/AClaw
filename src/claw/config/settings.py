@@ -6,7 +6,7 @@
 2. .claw/config.json（元信息） — 项目共享的结构化配置
 
 使用方式：
-    from agent.config.settings import settings
+    from claw.config.settings import settings
 
     # 传给 langchain_openai.ChatOpenAI（MiniMax 等 OpenAI 兼容 API）
     ChatOpenAI(
@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 # 路径解析
 # ---------------------------------------------------------------------------
-# src/agent/config/settings.py  →  项目根目录
+# src/claw/config/settings.py  →  项目根目录
 _ROOT = Path(__file__).parent.parent.parent.parent
 
 

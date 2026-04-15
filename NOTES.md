@@ -16,7 +16,7 @@ AClaw/
 ├── README.md                    # 项目说明文档
 ├── NOTES.md                     # 本文件
 │
-├── src/agent/                   # 核心代码
+├── src/claw/                   # 核心代码
 │   ├── __init__.py
 │   │
 │   ├── core/                    # 核心 Agent 逻辑
@@ -72,14 +72,14 @@ AClaw/
 ### 核心原则
 
 - **配置层先行**：所有新增代码优先从 `settings` 读配置，禁止硬编码
-- **LangChain 原生**：工具用 `@tool`，Agent 用 LangChain 原生类型，不造中间层
+- **LangChain v1.0 原生**：工具用 `@tool`，Agent 用 LangChain 原生类型，不造中间层
 - **无骨架文件**：新增模块必须有实质实现，禁止只建空壳占位
 
 ---
 
 ## 配置说明
 
-统一入口：`from agent.config.settings import settings`
+统一入口：`from claw.config.settings import settings`
 
 ### `.env` — 运行时密钥（不提交 git）
 
@@ -129,7 +129,7 @@ settings.project.version   # .claw/config.json → version
 
 ```python
 from langchain_openai import ChatOpenAI
-from agent.config.settings import settings
+from claw.config.settings import settings
 
 llm = ChatOpenAI(
     model=settings.llm.name,
@@ -143,14 +143,14 @@ llm = ChatOpenAI(
 
 ## 日志
 
-统一入口：`from agent.utils.logger import logger`
+统一入口：`from claw.utils.logger import logger`
 
 日志文件写入 `.claw/logs/aclaw_YYYY-MM-DD.log`，按 10MB 切割，保留 7 天，gzip 压缩旧文件。
 
 **禁止使用 `print()`，统一用 `logger`**：
 
 ```python
-from agent.utils.logger import logger
+from claw.utils.logger import logger
 
 logger.debug("debug info")
 logger.info("hello")
@@ -169,8 +169,8 @@ logger.error("failed")
 所有工具使用 LangChain `@tool`，统一从 `agent.tools` 导入：
 
 ```python
-from agent.tools import ALL_TOOLS   # list，直接注入 Agent
-from agent.tools import bash, grep, file_read, ...  # 单个工具
+from claw.tools import ALL_TOOLS   # list，直接注入 Agent
+from claw.tools import bash, grep, file_read, ...  # 单个工具
 ```
 
 | 工具 | 功能 | 输入字段 |

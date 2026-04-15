@@ -4,7 +4,7 @@ Loguru 日志配置。
 日志文件写入 .claw/logs/ 目录，按时间和大小自动切割。
 
 使用方式：
-    from agent.utils.logger import logger
+    from claw.utils.logger import logger
 
     logger.info("hello")
     logger.debug("debug info")
@@ -20,7 +20,7 @@ from loguru import logger
 # ---------------------------------------------------------------------------
 # 路径
 # ---------------------------------------------------------------------------
-# src/agent/utils/logger.py  →  项目根目录
+# src/claw/utils/logger.py  →  项目根目录
 _ROOT = Path(__file__).parent.parent.parent.parent
 _LOG_DIR = _ROOT / ".claw" / "logs"
 _LOG_DIR.mkdir(parents=True, exist_ok=True)

@@ -35,10 +35,13 @@ npm-debug.log*
 
 # 运行时记忆数据
 .claw/memory/session/
-.claw/memory/longterm/
+# .claw/memory/longterm/
 
 # Skill 运行时数据
 .claw/skills/*
+
+# ruff
+.ruff_cache/
 
 # 临时文件
 *.tmp

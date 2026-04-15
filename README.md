@@ -1,6 +1,6 @@
 # AClaw - Agent Framework
 
-基于 LangChain 的模块化 AI Agent 开发框架，支持 Tool Use、对话记忆、多入口部署。
+基于 LangChain v1.0 的模块化 AI Agent 开发框架，支持 Tool Use、对话记忆、多入口部署。
 
 ---
 
@@ -8,7 +8,7 @@
 
 ```
 AClaw/
-├── src/agent/                   # 核心代码
+├── src/claw/                   # 核心代码
 │   ├── core/                    # 核心 Agent 逻辑
 │   │   ├── agent.py            # Agent 主类，驱动对话循环
 │   │   ├── client.py            # SDK 封装
@@ -97,13 +97,13 @@ cp .env.example .env
 ### 3. 使用配置
 
 ```python
-from agent.config.settings import settings
+from claw.config.settings import settings
 ```
 
 ### 4. 日志
 
 ```python
-from agent.utils.logger import logger
+from claw.utils.logger import logger
 logger.info("hello")
 ```
 
@@ -112,8 +112,8 @@ logger.info("hello")
 ### 5. 内置工具
 
 ```python
-from agent.tools import ALL_TOOLS   # 全部工具列表，注入 Agent 用
-from agent.tools import bash, grep, file_read, file_write, ...
+from claw.tools import ALL_TOOLS   # 全部工具列表，注入 Agent 用
+from claw.tools import bash, grep, file_read, file_write, ...
 ```
 
 8 个内置工具：bash / file_read / file_write / file_edit / glob / grep / todo_write / config。
