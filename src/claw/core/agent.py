@@ -5,21 +5,21 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
 from claw.config.settings import settings
+from claw.core.memory import memory
 from claw.tools import ALL_TOOLS
 
 
 class LongTermState(AgentState):
-    """Agent 状态，继承 memory 模块的结构。"""
+    """Agent 状态结构，初始值在 invoke 时传入。"""
 
-    userprofile: dict = {}
-    longterm: dict = {}
-    shortterm: str = ""
-    session: str = ""
+    user_info: dict
+    preferences: dict
+    longterm: str
 
 
 @wrap_tool_call
 def handle_tool_errors(request, handler):
-    """使用自定义消息处理工具执行错误。"""
+    """工具执行错误处理。"""
     try:
         return handler(request)
     except Exception as e:
@@ -43,3 +43,22 @@ agent = create_agent(
     checkpointer=InMemorySaver(),
     middleware=[handle_tool_errors],
 )
+
+
+def invoke(message: str, thread_id: str = "1"):
+    """便捷调用入口。"""
+    return agent.invoke(
+        {
+            "messages": [{"role": "user", "content": message}],
+            "user_info": {
+                "用户信息": memory.userprofile.user_info,
+                "存储路径": memory.userprofile.user_info_path,
+            },
+            "preferences": {
+                "用户偏好": memory.userprofile.preferences,
+                "存储路径": memory.userprofile.preferences_path,
+            },
+            "longterm": f"用户长期记录存储目录：{memory.longterm.longterm_dir}",
+        },
+        {"configurable": {"thread_id": thread_id}},
+    )
