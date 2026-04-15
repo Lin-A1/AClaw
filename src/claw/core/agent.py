@@ -1,11 +1,16 @@
-from langchain.agents import create_agent
+from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import wrap_tool_call
 from langchain_core.messages import ToolMessage
 from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import InMemorySaver
 
 from claw.config.settings import settings
 from claw.tools import ALL_TOOLS
 
+
+class LongTermState(AgentState):
+    user_info: str
+    preferences: str
 
 @wrap_tool_call
 def handle_tool_errors(request, handler):
@@ -30,7 +35,17 @@ model = ChatOpenAI(
 agent = create_agent(
     model,
     tools=ALL_TOOLS,
+    state_schema=LongTermState,
+    checkpointer=InMemorySaver(),
     middleware=[handle_tool_errors]
 )
-response = agent.invoke({"messages": [{"role": "user", "content": "帮我看看我的系统目录结构"}]})
+response = agent.invoke(
+    {"messages": [{"role": "user", "content": "Hello"}]},
+    {"configurable": {"thread_id": "1"}},
+)
+
+response = agent.invoke(
+    {"messages": [{"role": "user", "content": "我叫什么"}]},
+    {"configurable": {"thread_id": "1"}},
+)
 print(response)
