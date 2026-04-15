@@ -1,7 +1,7 @@
 {
-  "name": "MultClaw",
-  "role": "personal-ai-assistant",
-  "description": "Personal AI assistant powered by MiniMax",
-  "version": "1.0.0",
+  "name": "AClaw",
+  "role": "claw-agent",
+  "description": "Agent Framework",
+  "version": "0.1.0",
   "port": 18000
 }
