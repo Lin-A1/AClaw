@@ -1,6 +1,11 @@
+"""
+Agent 核心定义。
+仅包含模型、工具、状态的初始化，不含调用逻辑。
+"""
+
 from langchain.agents import AgentState, create_agent
 from langchain.agents.middleware import wrap_tool_call
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import ToolMessage
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 
@@ -49,18 +54,3 @@ agent = create_agent(
     checkpointer=InMemorySaver(),
     middleware=[handle_tool_errors],
 )
-
-
-def invoke(message: str, thread_id: str = "1"):
-    """便捷调用入口。"""
-    return agent.invoke(
-        {
-            "messages": [
-                SystemMessage(content="your name aclaw"),
-                {"role": "user", "content": message},
-            ]
-        },
-        {"configurable": {"thread_id": thread_id}},
-    )
-
-print(invoke("我叫什么"))
