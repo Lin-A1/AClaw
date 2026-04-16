@@ -172,19 +172,26 @@ logger.error("failed")
 
 统一入口：`from claw.core.memory import memory`
 
+可通过 `CLAW_MEMORY_DIR` 环境变量覆盖存储路径，默认为 `~/.claw/memory/`。
+
 结构：
 
 ```
 Memory
-├── userprofile
-│   ├── user_info: str          # .claw/memory/user.md 内容
-│   ├── preferences: str        # .claw/memory/preferences.md 内容
-│   ├── user_info_path: str     # .claw/memory/user.md 路径
-│   └── preferences_path: str   # .claw/memory/preferences.md 路径
-├── longterm
-│   └── longterm_dir: str       # .claw/memory/longterm/ 路径（只写不读）
-├── shortterm: str               # 占位
-└── session: str                 # 占位
+├── userprofile: UserProfile        # 用户画像
+│   ├── user_info: str            # user.md 内容
+│   ├── preferences: str          # preferences.md 内容
+│   ├── reload()                  # 从文件重新加载
+│   ├── save_user_info()          # 写回 user.md
+│   └── save_preferences()        # 写回 preferences.md
+├── longterm: LongTermMemory       # 长期记忆文件管理
+│   ├── dir: Path                 # 记忆目录路径
+│   ├── list_files() -> list[str] # 列出所有 .md 文件名
+│   ├── read(filename) -> str     # 读取指定文件
+│   ├── write(filename, content)  # 覆盖写入
+│   ├── append(filename, content) # 追加内容
+│   └── delete(filename) -> bool # 删除文件
+└── shortterm: str                 # 占位（后续对接 checkpointer）
 ```
 
 使用方式：
@@ -192,11 +199,15 @@ Memory
 ```python
 from claw.core.memory import memory
 
-memory.userprofile.user_info       # str
-memory.userprofile.preferences     # str
-memory.userprofile.user_info_path  # str
-memory.userprofile.preferences_path # str
-memory.longterm.longterm_dir       # str
+# 读取
+memory.userprofile.user_info    # str
+memory.userprofile.preferences  # str
+memory.longterm.list_files()    # ['work.md', ...]
+memory.longterm.read("work.md") # str
+
+# 写入
+memory.userprofile.save_user_info("# 用户信息\n新的内容")
+memory.longterm.append("work.md", "新追加的内容")
 ```
 
 ---
