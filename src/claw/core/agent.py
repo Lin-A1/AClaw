@@ -56,25 +56,43 @@ class BaseAgent:
         return len(messages) > 0
 
     def invoke(
-        self,
-        message: str,
-        thread_id: str = "1",
-        system_prompt: str | None = None,
+            self,
+            message: str,
+            thread_id: str = "1",
+            system_prompt: str | None = None,
     ):
         """
         调用入口。
 
         system_prompt 仅在该 thread 的第一轮对话时注入，
-        后续轮次直接追加用户消息，避免历史中 SystemMessage 重复堆积。
+        后续轮次传入时替换原有的 SystemMessage。
         """
-        messages = []
+        config = {"configurable": {"thread_id": thread_id}}
 
-        if system_prompt and not self._thread_has_history(thread_id):
-            messages.append(SystemMessage(content=system_prompt))
+        if system_prompt:
+            checkpoint = self._checkpointer.get(config)
+            if checkpoint:
+                existing = checkpoint.get("channel_values", {}).get("messages", [])
+                replaced = False
+                new_messages = []
+                for msg in existing:
+                    if isinstance(msg, SystemMessage):
+                        new_messages.append(SystemMessage(content=system_prompt))
+                        replaced = True
+                    else:
+                        new_messages.append(msg)
+                if not replaced:
+                    new_messages.insert(0, SystemMessage(content=system_prompt))
+                messages = new_messages
+            else:
+                messages = [SystemMessage(content=system_prompt)]
+        else:
+            checkpoint = self._checkpointer.get(config)
+            messages = list(checkpoint.get("channel_values", {}).get("messages", [])) if checkpoint else []
 
         messages.append(HumanMessage(content=message))
 
         return self._agent.invoke(
             {"messages": messages},
-            {"configurable": {"thread_id": thread_id}},
+            config,
         )
