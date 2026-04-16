@@ -58,7 +58,6 @@ MODEL_APIKEY=your-api-key-here
 
 MAX_TOKENS=4096
 TEMPERATURE=1.0
-SYSTEM_PROMPT=You are a helpful AI assistant.
 
 LOG_LEVEL=INFO
 API_HOST=0.0.0.0

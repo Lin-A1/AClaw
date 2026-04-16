@@ -96,7 +96,6 @@ AClaw/
 | `MODEL_APIKEY` | API 密钥 | —（必填）|
 | `MAX_TOKENS` | 最大输出 token 数 | `4096` |
 | `TEMPERATURE` | 采样温度 | `1.0` |
-| `SYSTEM_PROMPT` | 系统提示词 | `You are a helpful AI assistant.` |
 | `LOG_LEVEL` | 日志级别 | `INFO` |
 | `API_HOST` | API 服务监听地址 | `0.0.0.0` |
 | `API_PORT` | API 服务端口 | `18000` |
@@ -119,7 +118,6 @@ settings.llm.url           # MODEL_URL
 settings.llm.api_key       # MODEL_APIKEY
 settings.llm.max_tokens    # MAX_TOKENS
 settings.llm.temperature   # TEMPERATURE
-settings.llm.system_prompt # SYSTEM_PROMPT
 settings.llm.api_base      # 等于 url + "/messages"（自动拼接）
 settings.server.host        # API_HOST
 settings.server.port       # API_PORT

@@ -78,3 +78,9 @@ class BaseAgent:
             {"messages": messages},
             {"configurable": {"thread_id": thread_id}},
         )
+
+
+a = BaseAgent()
+a.invoke(message='你好，我哥叫什么名字', system_prompt="用户的哥哥叫做lin")
+res = a.invoke(message='你好，我哥叫什么名字', system_prompt="用户的哥哥叫做aa")
+print(res)

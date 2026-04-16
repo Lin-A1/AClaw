@@ -45,7 +45,6 @@ class LLM(BaseModel):
     api_key: str = ""
     max_tokens: int = 4096
     temperature: float = 1.0
-    system_prompt: str = "You are a helpful AI assistant."
 
     @property
     def api_base(self) -> str:
@@ -104,7 +103,6 @@ def get_settings() -> Settings:
             api_key=env("MODEL_APIKEY", ""),
             max_tokens=int(env("MAX_TOKENS", "4096")),
             temperature=float(env("TEMPERATURE", "1.0")),
-            system_prompt=env("SYSTEM_PROMPT", "You are a helpful AI assistant."),
         ),
         server=Server(
             host=env("API_HOST", "0.0.0.0"),
