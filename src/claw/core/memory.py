@@ -1,17 +1,32 @@
 """
-Memory — 长期记忆 + 用户画像 + 会话历史。
+Memory — 多用户长期记忆 + 用户画像 + 会话历史。
+
+目录结构（可通过 CLAW_MEMORY_DIR 环境变量覆盖）：
+    .claw/memory/
+    ├── users/
+    │   └── {user_id}/                  # 多用户隔离
+    │       ├── user.md                 # 用户画像
+    │       ├── preferences.md          # 用户偏好
+    │       └── longterm/               # 长期记忆文件
+    └── session.db                      # 会话历史（由外部管理）
 
 使用方式：
-    from claw.core.memory import memory
+    from claw.core.memory import Memory
 
-    memory.userprofile.user_info          # 读取用户信息
-    memory.userprofile.save_user_info()   # 写回 user.md
+    # 访问默认用户（user_id="default"）
+    memory = Memory()
 
-    memory.longterm.list_files()          # 列出所有长期记忆文件名
-    memory.longterm.read("work.md")       # 读取某个文件
-    memory.longterm.write("work.md", ...) # 写入/覆盖某个文件
+    # 访问指定用户
+    memory = Memory(user_id="alice")
+
+    memory.userprofile.user_info         # 读取用户信息
+    memory.userprofile.save_user_info()  # 写回 user.md
+
+    memory.longterm.list_files()         # 列出所有长期记忆文件名
+    memory.longterm.read("work.md")      # 读取某个文件
+    memory.longterm.write("work.md", ...)  # 写入/覆盖某个文件
     memory.longterm.append("work.md", ...) # 追加内容
-    memory.longterm.delete("work.md")     # 删除某个文件
+    memory.longterm.delete("work.md")    # 删除某个文件
 """
 
 from __future__ import annotations
@@ -19,43 +34,44 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
-_MEMORY_DIR: Path = Path(
+_CLAW_MEMORY_DIR: Path = Path(
     os.environ.get("CLAW_MEMORY_DIR", Path.home() / ".claw" / "memory")
 )
-_LONGTERM_DIR: Path = _MEMORY_DIR / "longterm"
+_USERS_DIR: Path = _CLAW_MEMORY_DIR / "users"
+
+
+def _user_dir(user_id: str) -> Path:
+    return _USERS_DIR / user_id
 
 
 class UserProfile(BaseModel):
-    """用户画像，对应 memory/user.md 和 memory/preferences.md。"""
+    """用户画像，对应 users/{user_id}/user.md 和 preferences.md。"""
 
     model_config = {"arbitrary_types_allowed": True}
 
-    _user_info_path: Path = _MEMORY_DIR / "user.md"
-    _preferences_path: Path = _MEMORY_DIR / "preferences.md"
-
+    user_id: str = "default"
     user_info: str = ""
     preferences: str = ""
 
     def reload(self) -> None:
         """从文件重新加载（运行期文件被修改后调用）。"""
-        self.user_info = self._read(_MEMORY_DIR / "user.md")
-        self.preferences = self._read(_MEMORY_DIR / "preferences.md")
-
+        user_dir = _user_dir(self.user_id)
+        self.user_info = self._read(user_dir / "user.md")
+        self.preferences = self._read(user_dir / "preferences.md")
 
     def save_user_info(self, content: str | None = None) -> None:
         """将 user_info 写回 user.md。content 不为 None 时同时更新字段。"""
         if content is not None:
             self.user_info = content
-        self._write(_MEMORY_DIR / "user.md", self.user_info)
+        self._write(_user_dir(self.user_id) / "user.md", self.user_info)
 
     def save_preferences(self, content: str | None = None) -> None:
         """将 preferences 写回 preferences.md。"""
         if content is not None:
             self.preferences = content
-        self._write(_MEMORY_DIR / "preferences.md", self.preferences)
-
+        self._write(_user_dir(self.user_id) / "preferences.md", self.preferences)
 
     @staticmethod
     def _read(path: Path) -> str:
@@ -72,7 +88,7 @@ class LongTermMemory(BaseModel):
     长期记忆目录管理。
 
     目录结构示例：
-        .claw/memory/longterm/
+        .claw/memory/users/{user_id}/longterm/
             work.md
             projects.md
             contacts.md
@@ -84,12 +100,13 @@ class LongTermMemory(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    _dir: Path = _LONGTERM_DIR
+    user_id: str = "default"
 
     @property
     def dir(self) -> Path:
-        self._dir.mkdir(parents=True, exist_ok=True)
-        return self._dir
+        longterm_dir = _user_dir(self.user_id) / "longterm"
+        longterm_dir.mkdir(parents=True, exist_ok=True)
+        return longterm_dir
 
 
     def list_files(self) -> list[str]:
@@ -139,17 +156,14 @@ class Memory(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    userprofile: UserProfile = Field(default_factory=UserProfile)
-    longterm: LongTermMemory = Field(default_factory=LongTermMemory)
+    user_id: str = "default"
+    userprofile: UserProfile = UserProfile(user_id="default")
+    longterm: LongTermMemory = LongTermMemory(user_id="default")
     shortterm: str = ""  # 占位，后续对接 langgraph checkpointer
 
-
-def _load_memory() -> Memory:
-    """初始化并从文件读取用户画像。"""
-    m = Memory()
-    m.userprofile.reload()
-    return m
-
-
-# 模块级单例；需要刷新时调用 memory.userprofile.reload()
-memory: Memory = _load_memory()
+    def __init__(self, user_id: str = "default", **kwargs):
+        super().__init__(**kwargs)
+        self.user_id = user_id
+        self.userprofile = UserProfile(user_id=user_id)
+        self.longterm = LongTermMemory(user_id=user_id)
+        self.userprofile.reload()

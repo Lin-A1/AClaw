@@ -11,9 +11,12 @@ AClaw/
 │   ├── config.json             # 项目元信息
 │   ├── logs/                   # 日志文件（自动生成，不提交 git）
 │   └── memory/                 # 记忆存储
-│       ├── user.md             # 用户画像（user_info + path）
-│       ├── preferences.md       # 用户偏好（preferences + path）
-│       └── longterm/           # 长期历史（不读内容）
+│       ├── users/              # 多用户隔离
+│       │   └── {user_id}/       # 用户目录
+│       │       ├── user.md      # 用户画像
+│       │       ├── preferences.md  # 用户偏好
+│       │       └── longterm/   # 长期记忆文件
+│       └── session.db          # 会话历史
 ├── .env                         # 环境变量（API Key 等，不提交到 git）
 ├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
 ├── requirements.txt             # 依赖列表
@@ -168,34 +171,43 @@ logger.error("failed")
 
 ## 记忆模块
 
-统一入口：`from claw.core.memory import memory`
+统一入口：`from claw.core.memory import Memory`
 
-可通过 `CLAW_MEMORY_DIR` 环境变量覆盖存储路径，默认为 `~/.claw/memory/`。
+可通过 `CLAW_MEMORY_DIR` 环境变量覆盖存储根路径，默认为 `~/.claw/memory/`。
 
 结构：
 
 ```
-Memory
+Memory(user_id="default")
 ├── userprofile: UserProfile        # 用户画像
+│   ├── user_id: str              # 用户标识
 │   ├── user_info: str            # user.md 内容
 │   ├── preferences: str          # preferences.md 内容
 │   ├── reload()                  # 从文件重新加载
 │   ├── save_user_info()          # 写回 user.md
 │   └── save_preferences()        # 写回 preferences.md
 ├── longterm: LongTermMemory       # 长期记忆文件管理
+│   ├── user_id: str              # 用户标识
 │   ├── dir: Path                 # 记忆目录路径
 │   ├── list_files() -> list[str] # 列出所有 .md 文件名
 │   ├── read(filename) -> str     # 读取指定文件
 │   ├── write(filename, content)  # 覆盖写入
 │   ├── append(filename, content) # 追加内容
-│   └── delete(filename) -> bool # 删除文件
+│   ├── exists(filename) -> bool  # 文件是否存在
+│   └── delete(filename) -> bool  # 删除文件
 └── shortterm: str                 # 占位（后续对接 checkpointer）
 ```
 
 使用方式：
 
 ```python
-from claw.core.memory import memory
+from claw.core.memory import Memory
+
+# 访问默认用户
+memory = Memory()
+
+# 访问指定用户
+memory = Memory(user_id="alice")
 
 # 读取
 memory.userprofile.user_info    # str
