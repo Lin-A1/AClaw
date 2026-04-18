@@ -10,13 +10,7 @@ AClaw/
 ├── .claw/                       # 项目数据（可提交结构，不含敏感数据）
 │   ├── config.json             # 项目元信息
 │   ├── logs/                   # 日志文件（自动生成，不提交 git）
-│   └── memory/                 # 记忆存储
-│       ├── users/              # 多用户隔离
-│       │   └── {user_id}/       # 用户目录
-│       │       ├── user.md      # 用户画像
-│       │       ├── preferences.md  # 用户偏好
-│       │       └── longterm/   # 长期记忆文件
-│       └── session.db          # 会话历史
+│   └── memory/                 # 记忆存储（见记忆模块章节）
 ├── .env                         # 环境变量（API Key 等，不提交到 git）
 ├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
 ├── requirements.txt             # 依赖列表
@@ -88,49 +82,11 @@ AClaw/
 
 统一入口：`from claw.config.settings import settings`
 
-### `.env` — 运行时密钥（不提交 git）
+环境变量（`.env`，见 `.env.example`）：`MODEL_NAME`、`MODEL_URL`、`MODEL_APIKEY`、`MAX_TOKENS`、`TEMPERATURE`、`LOG_LEVEL`、`API_HOST`、`API_PORT`。
 
-从 `.env.example` 复制后填入真实值。
+项目元信息（`.claw/config.json`）：`name`、`role`、`description`、`version`、`port`。
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `MODEL_NAME` | 模型名称 | `MiniMax-M2.7` |
-| `MODEL_URL` | API 地址 | `https://api.minimaxi.com/v1` |
-| `MODEL_APIKEY` | API 密钥 | —（必填）|
-| `MAX_TOKENS` | 最大输出 token 数 | `4096` |
-| `TEMPERATURE` | 采样温度 | `1.0` |
-| `LOG_LEVEL` | 日志级别 | `INFO` |
-| `API_HOST` | API 服务监听地址 | `0.0.0.0` |
-| `API_PORT` | API 服务端口 | `18000` |
-
-### `.claw/config.json` — 项目元信息（可提交）
-
-| 字段 | 说明 |
-|------|------|
-| `name` | 项目名称 |
-| `role` | Agent 角色标识 |
-| `description` | 项目描述 |
-| `version` | 版本号 |
-| `port` | 默认端口 |
-
-### Settings 对象
-
-```python
-settings.llm.name           # MODEL_NAME
-settings.llm.url           # MODEL_URL
-settings.llm.api_key       # MODEL_APIKEY
-settings.llm.max_tokens    # MAX_TOKENS
-settings.llm.temperature   # TEMPERATURE
-settings.llm.api_base      # 等于 url + "/messages"（自动拼接）
-settings.server.host        # API_HOST
-settings.server.port       # API_PORT
-settings.log.level         # LOG_LEVEL
-settings.project.name      # .claw/config.json → name
-settings.project.role      # .claw/config.json → role
-settings.project.version   # .claw/config.json → version
-```
-
-传给 ChatModel 的典型用法：
+使用方式：
 
 ```python
 from langchain_openai import ChatOpenAI
@@ -171,81 +127,47 @@ logger.error("failed")
 
 ## 记忆模块
 
-统一入口：`from claw.core.memory import Memory`
+`from claw.core.memory import Memory`
 
-可通过 `CLAW_MEMORY_DIR` 环境变量覆盖存储根路径，默认为 `~/.claw/memory/`。
-
-结构：
-
-```
-Memory(user_id="default")
-├── userprofile: UserProfile        # 用户画像
-│   ├── user_id: str              # 用户标识
-│   ├── user_info: str            # user.md 内容
-│   ├── preferences: str          # preferences.md 内容
-│   ├── reload()                  # 从文件重新加载
-│   ├── save_user_info()          # 写回 user.md
-│   └── save_preferences()        # 写回 preferences.md
-├── longterm: LongTermMemory       # 长期记忆文件管理
-│   ├── user_id: str              # 用户标识
-│   ├── dir: Path                 # 记忆目录路径
-│   ├── list_files() -> list[str] # 列出所有 .md 文件名
-│   ├── read(filename) -> str     # 读取指定文件
-│   ├── write(filename, content)  # 覆盖写入
-│   ├── append(filename, content) # 追加内容
-│   ├── exists(filename) -> bool  # 文件是否存在
-│   └── delete(filename) -> bool  # 删除文件
-└── shortterm: str                 # 占位（后续对接 checkpointer）
-```
-
-使用方式：
+目录结构：`.claw/memory/users/{user_id}/{user.md,preferences.md,longterm/*.md}`，可通过 `CLAW_MEMORY_DIR` 环境变量覆盖。
 
 ```python
-from claw.core.memory import Memory
+memory = Memory()                        # 默认用户
+memory = Memory(user_id="alice")        # 指定用户
 
-# 访问默认用户
-memory = Memory()
+memory.userprofile.user_info            # user.md 内容
+memory.userprofile.preferences          # preferences.md 内容
+memory.userprofile.save_user_info(...)  # 写回 user.md
+memory.userprofile.save_preferences(...)# 写回 preferences.md
 
-# 访问指定用户
-memory = Memory(user_id="alice")
-
-# 读取
-memory.userprofile.user_info    # str
-memory.userprofile.preferences  # str
-memory.longterm.list_files()    # ['work.md', ...]
-memory.longterm.read("work.md") # str
-
-# 写入
-memory.userprofile.save_user_info("# 用户信息\n新的内容")
-memory.longterm.append("work.md", "新追加的内容")
+memory.longterm.list_files()            # ['work.md', ...]
+memory.longterm.read("work.md")         # str
+memory.longterm.write("work.md", ...)
+memory.longterm.append("work.md", ...)
+memory.longterm.delete("work.md")
 ```
 
 ---
 
 ## 内置工具
 
-所有工具使用 LangChain `@tool`，统一从 `agent.tools` 导入：
+LangChain `@tool`，统一从 `claw.tools` 导入。
 
 ```python
-from claw.tools import ALL_TOOLS   # list，直接注入 Agent
+from claw.tools import ALL_TOOLS   # 全部工具
 from claw.tools import bash, grep, file_read, ...  # 单个工具
 ```
 
-| 工具 | 功能 | 输入字段 |
-|------|------|---------|
-| `bash` | 执行 Shell 命令 | `command`, `timeout?`, `cwd?` |
-| `file_read` | 读文件（支持分页） | `path`, `offset?`, `limit?` |
-| `file_write` | 写文件（覆盖） | `path`, `content` |
-| `file_edit` | 精确字符串替换 | `path`, `old_string`, `new_string` |
-| `glob` | 文件模式匹配 | `pattern`, `root?` |
-| `grep` | 正则内容搜索 | `pattern`, `path?`, `file_pattern?`, `case_sensitive?` |
-| `todo_write` | Todo 列表管理 | `action`, `content?`, `index?` |
-| `config` | 配置读写 | `action`, `key?`, `value?`, `scope?` |
-
-状态存储：
-- `todo_write` → `.claw/todo.json`
-- `config(scope=env)` → `.env`
-- `config(scope=config)` → `.claw/config.json`
+| 工具 | 功能 | 输入字段 | 状态存储 |
+|------|------|---------|---------|
+| `bash` | 执行 Shell 命令 | `command`, `timeout?`, `cwd?` | — |
+| `file_read` | 读文件（支持分页） | `path`, `offset?`, `limit?` | — |
+| `file_write` | 写文件（覆盖） | `path`, `content` | — |
+| `file_edit` | 精确字符串替换 | `path`, `old_string`, `new_string` | — |
+| `glob` | 文件模式匹配 | `pattern`, `root?` | — |
+| `grep` | 正则内容搜索 | `pattern`, `path?`, `file_pattern?`, `case_sensitive?` | — |
+| `todo_write` | Todo 列表管理 | `action`, `content?`, `index?` | `.claw/todo.json` |
+| `config` | 配置读写 | `action`, `key?`, `value?`, `scope?` | `.env` / `.claw/config.json` |
 
 ---
 
