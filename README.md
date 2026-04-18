@@ -8,12 +8,36 @@
 
 ```
 AClaw/
+├── .env                         # 环境变量（API Key 等，不提交到 git）
+├── .env.example                 # 环境变量模板
+├── .gitignore                   # git 忽略规则
+├── .claw/                       # 项目数据（可提交结构，不含敏感数据）
+│   ├── config.json             # 项目元信息
+│   ├── logs/                   # 日志文件（自动生成，不提交 git）
+│   └── memory/                 # 记忆存储
+│       ├── users/              # 多用户隔离
+│       │   └── {user_id}/       # 用户目录
+│       │       ├── user.md      # 用户画像
+│       │       ├── preferences.md  # 用户偏好
+│       │       └── longterm/   # 长期记忆文件
+│       └── session.db          # 会话历史
+├── .env                         # 环境变量（API Key 等，不提交到 git）
+├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
+├── requirements.txt             # 依赖列表
+├── README.md                    # 项目说明文档
+├── NOTES.md                     # 本文件
+│
 ├── src/claw/                   # 核心代码
+│   ├── __init__.py
+│   │
 │   ├── core/                    # 核心 Agent 逻辑
-│   │   ├── agent.py            # Agent 主类，驱动对话循环
+│   │   ├── __init__.py
+│   │   ├── agent.py             # Agent 主类，驱动对话循环
 │   │   ├── client.py            # SDK 封装
-│   │   └── memory.py            # 对话历史 / 上下文管理
+│   │   └── memory.py            # 记忆模块（userprofile/longterm/shortterm）
+│   │
 │   ├── tools/                   # 内置工具（LangChain @tool）
+│   │   ├── __init__.py         # ALL_TOOLS 工具列表导出
 │   │   ├── bash.py             # 执行 Shell 命令
 │   │   ├── file_read.py        # 读文件（支持分页）
 │   │   ├── file_write.py       # 写文件（覆盖）
@@ -22,28 +46,38 @@ AClaw/
 │   │   ├── grep.py             # 正则内容搜索
 │   │   ├── todo_write.py       # Todo 列表管理
 │   │   └── config.py            # 配置读写（.env / config.json）
+│   │
 │   ├── prompts/                 # Prompt 管理
+│   │   ├── __init__.py
 │   │   ├── system.py            # System Prompt 模板
-│   │   └── templates/agent.txt
+│   │   └── templates/
+│   │       └── agent.txt
+│   │
 │   ├── config/                  # 配置管理
+│   │   ├── __init__.py
 │   │   └── settings.py          # 读取 .env，统一配置入口
+│   │
 │   └── utils/                   # 工具函数
+│       ├── __init__.py
 │       ├── logger.py            # 日志配置
 │       └── helpers.py
-├── interfaces/                   # 不同交互入口
-│   ├── cli.py                  # 命令行对话界面
-│   ├── api_server.py           # FastAPI Web 服务
-│   └── gradio_app.py           # Gradio UI（可选）
-├── tests/                       # 单元 & 集成测试
-├── examples/                    # 使用示例
 │
-├── .env                         # 环境变量（不提交 git）
-├── .env.example                 # 环境变量模板
-├── .claw/config.json            # 项目元信息（可提交）
-├── .claw/logs/                 # 日志文件（自动生成）
-├── pyproject.toml               # 依赖配置（uv / poetry）
-├── requirements.txt            # pip 依赖列表
-└── NOTES.md                    # 代码注意事项
+├── interfaces/                   # 不同交互入口
+│   ├── cli.py                   # 命令行对话界面
+│   ├── api_server.py            # FastAPI / Flask Web 服务
+│   └── gradio_app.py            # Gradio UI（可选）
+│
+├── tests/                       # 单元 & 集成测试
+│   ├── __init__.py
+│   ├── test_agent.py
+│   ├── test_tools.py
+│   └── fixtures/
+│       └── sample_responses.json
+│
+└── examples/                    # 使用示例
+    ├── simple_chat.py
+    ├── tool_use_demo.py
+    └── multi_turn_demo.py
 ```
 
 ---
