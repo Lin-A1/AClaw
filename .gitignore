@@ -34,7 +34,9 @@ npm-debug.log*
 .env
 
 # 运行时记忆数据
-.claw/memory/session/
+.claw/memory/session.db
+.claw/memory/user/*
+!.claw/memory/user/default
 # .claw/memory/longterm/
 
 # Skill 运行时数据
