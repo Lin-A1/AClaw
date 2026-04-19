@@ -10,6 +10,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class FileWriteInput(BaseModel):
     path: Annotated[str, Field(description="文件路径")]
@@ -28,4 +30,5 @@ def file_write(path: str, content: str) -> str:
         p.write_text(content, encoding="utf-8")
         return f"[写入成功] {path} ({len(content)} bytes)"
     except Exception as exc:
+        logger.error(f"file_write 失败 [{path}]: {exc}")
         return f"[错误] 写入失败: {exc}"

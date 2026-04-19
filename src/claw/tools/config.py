@@ -13,6 +13,8 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 _ROOT = Path(__file__).parent.parent.parent.parent
 _ENV_FILE = _ROOT / ".env"
 _CONFIG_FILE = _ROOT / ".claw" / "config.json"
@@ -74,7 +76,11 @@ def config(action: str, key: str | None = None, value: str | None = None, scope:
                         env_vars[k.strip()] = v.strip()
             env_vars[key] = value
             lines = [f"{k}={v}" for k, v in env_vars.items()]
-            _ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            try:
+                _ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            except Exception as e:
+                logger.error(f"config 写入 .env 失败: {e}")
+                raise
             # reload
             load_dotenv(_ENV_FILE, override=True)
             return f"[已写入] {key}={value!r} → .env"
@@ -101,5 +107,9 @@ def config(action: str, key: str | None = None, value: str | None = None, scope:
             if not key or value is None:
                 return "[错误] set 需要指定 key 和 value"
             cfg[key] = value
-            _CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            try:
+                _CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            except Exception as e:
+                logger.error(f"config 写入 .claw/config.json 失败: {e}")
+                raise
             return f"[已写入] {key}={value!r} → .claw/config.json"

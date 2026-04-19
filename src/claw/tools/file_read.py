@@ -10,6 +10,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class FileReadInput(BaseModel):
     path: Annotated[str, Field(description="文件路径")]
@@ -34,6 +36,7 @@ def file_read(path: str, offset: int = 1, limit: int = 200) -> str:
     try:
         lines = p.read_text(encoding="utf-8").splitlines()
     except Exception as exc:
+        logger.error(f"file_read 读取失败 [{path}]: {exc}")
         return f"[错误] 无法读取: {exc}"
 
     start = max(0, offset - 1)

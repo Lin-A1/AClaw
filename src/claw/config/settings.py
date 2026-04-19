@@ -1,9 +1,10 @@
 """
 统一配置入口。
 
-加载优先级：
-1. .env（密钥、运行时参数）  — 通过 python-dotenv 加载
-2. .claw/config.json（元信息） — 项目共享的结构化配置
+加载优先级（从高到低）：
+1. 环境变量（运行时动态覆盖，如 MODEL_APIKEY）
+2. .claw/config.json（项目共享的非敏感配置）
+3. 代码默认值（绝对兜底）
 
 使用方式：
     from claw.config.settings import settings
@@ -51,6 +52,11 @@ class LLM(BaseModel):
         return f"{self.url.rstrip('/')}/messages"
 
 
+class Memory(BaseModel):
+    root: Path = Field(default_factory=lambda: _ROOT / ".claw" / "memory")
+    db_path: Path = Field(default_factory=lambda: _ROOT / ".claw" / "memory" / "session.db")
+
+
 class Server(BaseModel):
     host: str = "0.0.0.0"
     port: int = 18000
@@ -76,6 +82,7 @@ class Settings(BaseModel):
     llm: LLM = Field(default_factory=LLM)
     server: Server = Field(default_factory=Server)
     log: Log = Field(default_factory=Log)
+    memory: Memory = Field(default_factory=Memory)
     project: Project = Field(default_factory=Project)
 
 
@@ -87,31 +94,47 @@ class Settings(BaseModel):
 def get_settings() -> Settings:
     load_dotenv(_ROOT / ".env", override=False)
 
-    project_meta: dict[str, Any] = {}
+    config_meta: dict[str, Any] = {}
     config_path = _ROOT / ".claw" / "config.json"
     if config_path.exists():
         with open(config_path, encoding="utf-8") as f:
-            project_meta = json.load(f)
+            config_meta = json.load(f)
 
     def env(key: str, fallback: str = "") -> str:
         return os.environ.get(key, fallback)
 
+    llm_meta: dict[str, Any] = config_meta.get("llm", {})
+    server_meta: dict[str, Any] = config_meta.get("server", {})
+    log_meta: dict[str, Any] = config_meta.get("log", {})
+    memory_meta: dict[str, Any] = config_meta.get("memory", {})
+
+    memory_root_env = env("CLAW_MEMORY_DIR", "")
+    memory_root = (
+        Path(memory_root_env)
+        if memory_root_env
+        else Path(memory_meta.get("root", str(_ROOT / ".claw" / "memory")))
+    )
+
     return Settings(
         llm=LLM(
-            name=env("MODEL_NAME", "MiniMax-M2.7"),
-            url=env("MODEL_URL", "https://api.minimaxi.com/v1"),
+            name=env("MODEL_NAME", llm_meta.get("name", "MiniMax-M2.7")),
+            url=env("MODEL_URL", llm_meta.get("url", "https://api.minimaxi.com/v1")),
             api_key=env("MODEL_APIKEY", ""),
-            max_tokens=int(env("MAX_TOKENS", "4096")),
-            temperature=float(env("TEMPERATURE", "1.0")),
+            max_tokens=int(env("MAX_TOKENS", str(llm_meta.get("max_tokens", 4096)))),
+            temperature=float(env("TEMPERATURE", str(llm_meta.get("temperature", 1.0)))),
         ),
         server=Server(
-            host=env("API_HOST", "0.0.0.0"),
-            port=int(env("API_PORT", "18000")),
+            host=env("API_HOST", server_meta.get("host", "0.0.0.0")),
+            port=int(env("API_PORT", str(server_meta.get("port", 18000)))),
         ),
         log=Log(
-            level=env("LOG_LEVEL", "INFO"),
+            level=env("LOG_LEVEL", log_meta.get("level", "INFO")),
         ),
-        project=Project(**project_meta),
+        memory=Memory(
+            root=memory_root,
+            db_path=memory_root / "session.db",
+        ),
+        project=Project(**config_meta),
     )
 
 

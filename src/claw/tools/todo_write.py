@@ -11,6 +11,8 @@ from typing import Annotated, Literal
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 _TODO_FILE = Path(__file__).parent.parent.parent.parent / ".claw" / "todo.json"
 
 
@@ -25,7 +27,11 @@ def _load() -> dict:
 
 def _save(data: dict) -> None:
     _TODO_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _TODO_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        _TODO_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        logger.error(f"todo_write 保存失败: {e}")
+        raise
 
 
 class TodoWriteInput(BaseModel):

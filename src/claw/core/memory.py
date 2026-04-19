@@ -31,14 +31,14 @@ Memory — 多用户长期记忆 + 用户画像 + 会话历史。
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from pydantic import BaseModel
 
-_CLAW_MEMORY_DIR: Path = Path(
-    os.environ.get("CLAW_MEMORY_DIR", Path.home() / ".claw" / "memory")
-)
+from claw.config.settings import settings
+from claw.utils.logger import logger
+
+_CLAW_MEMORY_DIR: Path = settings.memory.root
 _USERS_DIR: Path = _CLAW_MEMORY_DIR / "users"
 
 
@@ -80,7 +80,11 @@ class UserProfile(BaseModel):
     @staticmethod
     def _write(path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
+        try:
+            path.write_text(content, encoding="utf-8")
+        except Exception as e:
+            logger.error(f"写入记忆文件失败 [{path}]: {e}")
+            raise
 
 
 class LongTermMemory(BaseModel):

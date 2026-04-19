@@ -4,14 +4,13 @@
 
 ```
 AClaw/
-├── .env                         # 环境变量（API Key 等，不提交到 git）
-├── .env.example                 # 环境变量模板
+├── .env                         # 环境变量（仅 API Key，不提交到 git）
+├── .env.example                 # 环境变量模板（仅占位符）
 ├── .gitignore                   # git 忽略规则
-├── .claw/                       # 项目数据（可提交结构，不含敏感数据）
-│   ├── config.json             # 项目元信息
-│   ├── logs/                   # 日志文件（自动生成，不提交 git）
-│   └── memory/                 # 记忆存储（见记忆模块章节）
-├── .env                         # 环境变量（API Key 等，不提交到 git）
+├── .claw/                       # 项目数据（可提交，含非敏感配置）
+│   ├── config.json            # 项目元信息 + 运行时配置
+│   ├── logs/                  # 日志文件（自动生成，不提交 git）
+│   └── memory/                # 记忆存储（见记忆模块章节）
 ├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
 ├── requirements.txt             # 依赖列表
 ├── README.md                    # 项目说明文档
@@ -82,9 +81,20 @@ AClaw/
 
 统一入口：`from claw.config.settings import settings`
 
-环境变量（`.env`，见 `.env.example`）：`MODEL_NAME`、`MODEL_URL`、`MODEL_APIKEY`、`MAX_TOKENS`、`TEMPERATURE`、`LOG_LEVEL`、`API_HOST`、`API_PORT`。
+配置分层：
+- **`.env`**（不提交 git）：仅含 `MODEL_APIKEY`
+- **`.claw/config.json`**（可提交）：含 `llm`、`server`、`log`、`memory`、`project` 所有非敏感配置
 
-项目元信息（`.claw/config.json`）：`name`、`role`、`description`、`version`、`port`。
+```json
+{
+  "name": "AClaw",
+  "llm": { "name": "MiniMax-M2.7", "url": "https://api.minimaxi.com/v1" },
+  "server": { "host": "0.0.0.0", "port": 18000 },
+  "log": { "level": "INFO" },
+  "memory": { "root": ".claw/memory" },
+  "project": { "role": "claw-agent", "version": "0.1.0" }
+}
+```
 
 使用方式：
 
@@ -129,7 +139,7 @@ logger.error("failed")
 
 `from claw.core.memory import Memory`
 
-目录结构：`.claw/memory/users/{user_id}/{user.md,preferences.md,longterm/*.md}`，可通过 `CLAW_MEMORY_DIR` 环境变量覆盖。
+目录结构：`.claw/memory/users/{user_id}/{user.md,preferences.md,longterm/*.md}`，根目录由 `settings.memory.root` 控制（默认 `.claw/memory`）。
 
 ```python
 memory = Memory()                        # 默认用户
@@ -180,7 +190,8 @@ from claw.tools import bash, grep, file_read, ...  # 单个工具
 | `langchain-openai` | ChatModel，MiniMax 等 OpenAI 兼容 API |
 | `tiktoken` | token 计数，控制上下文长度 |
 | `python-dotenv` | 加载 .env 环境变量 |
-| `pydantic` | 配置模型（LLM / Server / Log / Project） |
+| `pydantic` | 配置模型（LLM / Server / Log / Memory / Project） |
+| `langgraph` | Agent 图构建 + checkpointer（SqliteSaver） |
 | `loguru` | 日志 |
 
 可选依赖（`uv sync aclaw[api,ui,dev]` 装全量）：
@@ -203,10 +214,11 @@ from claw.tools import bash, grep, file_read, ...  # 单个工具
 - [ ] 工具使用 LangChain `@tool`，不再自建 base.py / register_tool
 - [ ] 配置从 `settings` 读取，不硬编码
 - [ ] `ruff . --fix` 检查并修复格式问题
+- [ ] `python -m claw.core.agent` 验证模块可正常导入运行
 
 ### 2. README.md
 - [ ] 新增了文件/目录 → 更新项目结构
-- [ ] 新增了环境变量 → 更新 .env.example + README 环境变量章节
+- [ ] 新增了非敏感配置 → 更新 config.json 示例
 - [ ] 新增了核心概念 → 更新主要依赖表格
 - [ ] 新增了使用方式 → 更新快速开始
 
@@ -214,6 +226,7 @@ from claw.tools import bash, grep, file_read, ...  # 单个工具
 - [ ] 新增了依赖 → pyproject.toml + requirements.txt 两处同步添加
 - [ ] 不需要的依赖 → 两处同步删除
 - [ ] 新增/修改了配置字段、架构规则、使用方式 → NOTES.md 同步更新
+- [ ] 非敏感配置（llm/server/log/memory）写在 `.claw/config.json`，不写进 `.env`
 
 ### 4. Git
 - [ ] `git status` 查看变更范围

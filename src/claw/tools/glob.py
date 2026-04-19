@@ -10,6 +10,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class GlobInput(BaseModel):
     pattern: Annotated[str, Field(description="glob 模式，如 **/*.py、src/**/*.ts")]
@@ -34,6 +36,7 @@ def glob(pattern: str, root: str | None = None) -> str:
     try:
         matches = list(root_path.glob(pattern))
     except Exception as exc:
+        logger.error(f"glob 失败 [{pattern}]: {exc}")
         return f"[错误] glob 失败: {exc}"
 
     if not matches:

@@ -10,6 +10,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class FileEditInput(BaseModel):
     path: Annotated[str, Field(description="文件路径")]
@@ -32,6 +34,7 @@ def file_edit(path: str, old_string: str, new_string: str) -> str:
     try:
         text = p.read_text(encoding="utf-8")
     except Exception as exc:
+        logger.error(f"file_edit 读取失败 [{path}]: {exc}")
         return f"[错误] 读取失败: {exc}"
 
     if old_string not in text:

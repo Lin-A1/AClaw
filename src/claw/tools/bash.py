@@ -10,6 +10,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class BashInput(BaseModel):
     command: Annotated[str, Field(description="要执行的 shell 命令")]
@@ -34,6 +36,8 @@ def bash(command: str, timeout: int = 30, cwd: str | None = None) -> str:
             return output or "(命令执行成功，无输出)"
         return f"[exit {result.returncode}]\n{output}"
     except subprocess.TimeoutExpired:
+        logger.warning(f"bash 超时: {command[:80]}")
         return f"[超时 {timeout}s]"
     except Exception as exc:
+        logger.error(f"bash 执行失败 [{command[:80]}]: {exc}")
         return f"[错误] {exc}"

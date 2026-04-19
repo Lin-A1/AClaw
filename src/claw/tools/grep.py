@@ -11,6 +11,8 @@ from typing import Annotated
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
+from claw.utils.logger import logger
+
 
 class GrepInput(BaseModel):
     pattern: Annotated[str, Field(description="正则表达式")]
@@ -49,6 +51,7 @@ def grep(
         glob_pat = f"**/{file_pattern}" if file_pattern else "**/*"
         files = [p for p in search_root.glob(glob_pat) if p.is_file()]
     except Exception as exc:
+        logger.error(f"grep 文件遍历失败 [{search_root}]: {exc}")
         return f"[错误] 文件遍历失败: {exc}"
 
     results: list[str] = []

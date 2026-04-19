@@ -3,14 +3,17 @@ Agent 核心类。
 封装模型、状态、agent 实例，对外提供 invoke 接口。
 """
 
+import sqlite3
+
 from langchain.agents import create_agent
 from langchain.agents.middleware import wrap_tool_call
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 
 from claw.config.settings import settings
 from claw.tools import ALL_TOOLS
+from claw.utils.logger import logger
 
 
 class BaseAgent:
@@ -24,7 +27,8 @@ class BaseAgent:
             max_tokens=settings.llm.max_tokens,
         )
 
-        self._checkpointer = InMemorySaver()
+        conn = sqlite3.connect(str(settings.memory.db_path), check_same_thread=False)
+        self._checkpointer = SqliteSaver(conn)
         self._agent = create_agent(
             self.model,
             tools=ALL_TOOLS,
@@ -38,6 +42,7 @@ class BaseAgent:
         try:
             return handler(request)
         except Exception as e:
+            logger.error(f"工具 [{request.tool_call['name']}] 执行失败: {e}")
             return ToolMessage(
                 content=f"工具错误：请检查您的输入并重试。({str(e)})",
                 tool_call_id=request.tool_call["id"]
@@ -78,4 +83,7 @@ class BaseAgent:
             {"messages": messages},
             {"configurable": {"thread_id": thread_id}},
         )
-    
+
+
+a = BaseAgent()
+print(a.invoke("你好，我叫什么名字"))
