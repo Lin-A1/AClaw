@@ -8,20 +8,19 @@
 
 ```
 AClaw/
-├── .env                         # 环境变量（API Key 等，不提交到 git）
-├── .env.example                 # 环境变量模板
+├── .env                         # 环境变量（仅 API Key，不提交到 git）
+├── .env.example                 # 环境变量模板（仅占位符）
 ├── .gitignore                   # git 忽略规则
-├── .claw/                       # 项目数据（可提交结构，不含敏感数据）
-│   ├── config.json             # 项目元信息
-│   ├── logs/                   # 日志文件（自动生成，不提交 git）
-│   └── memory/                 # 记忆存储
+├── .claw/                       # 项目数据（可提交，含非敏感配置）
+│   ├── config.json            # 项目元信息 + 运行时配置
+│   ├── logs/                  # 日志文件（自动生成，不提交 git）
+│   └── memory/                # 记忆存储
 │       ├── users/              # 多用户隔离
 │       │   └── {user_id}/       # 用户目录
 │       │       ├── user.md      # 用户画像
 │       │       ├── preferences.md  # 用户偏好
 │       │       └── longterm/   # 长期记忆文件
-│       └── session.db          # 会话历史
-├── .env                         # 环境变量（API Key 等，不提交到 git）
+│       └── session.db          # 会话历史（SqliteSaver checkpoint）
 ├── pyproject.toml               # 项目依赖配置（推荐用 uv 或 poetry）
 ├── requirements.txt             # 依赖列表
 ├── README.md                    # 项目说明文档
@@ -82,30 +81,25 @@ AClaw/
 
 ---
 
-## 环境变量
+## 配置
 
-**`.env`**（不提交 git）：
+统一入口：`from claw.config.settings import settings`
+
+**`.env`**（不提交 git）：仅含 API Key
 ```bash
-MODEL_NAME=MiniMax-M2.7
-MODEL_URL=https://api.minimaxi.com/v1
 MODEL_APIKEY=your-api-key-here
-
-MAX_TOKENS=4096
-TEMPERATURE=1.0
-
-LOG_LEVEL=INFO
-API_HOST=0.0.0.0
-API_PORT=18000
 ```
 
-**`.claw/config.json`**（可提交）：
+**`.claw/config.json`**（可提交）：所有非敏感配置
+
 ```json
 {
   "name": "AClaw",
-  "role": "claw-agent",
-  "description": "Agent Framework",
-  "version": "0.1.0",
-  "port": 18000
+  "llm": { "name": "MiniMax-M2.7", "url": "https://api.minimaxi.com/v1" },
+  "server": { "host": "0.0.0.0", "port": 18000 },
+  "log": { "level": "INFO" },
+  "memory": { "root": ".claw/memory" },
+  "project": { "role": "claw-agent", "version": "0.1.0" }
 }
 ```
 
@@ -120,11 +114,12 @@ uv sync          # 推荐
 pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+### 2. 配置
 
 ```bash
 cp .env.example .env
-# 编辑 .env，填入真实的 API Key
+# 编辑 .env，填入 MODEL_APIKEY
+# 编辑 .claw/config.json，配置 LLM / Server / Memory 等
 ```
 
 ### 3. 使用配置
